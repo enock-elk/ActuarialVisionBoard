@@ -49,16 +49,43 @@
             /* Hide elements marked as no-print */
             .no-print { display: none !important; }
 
-            /* Ensure page breaks don't chop components in half */
+            /* Page Break Logic */
             .break-inside-avoid {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
+            
+            .break-after-avoid {
+                break-after: avoid;
+                page-break-after: avoid;
+            }
 
-            /* Dark mode print overrides */
+            /* Dark Mode Print Overrides */
+            /* We explicitly force the dark colors in print if the HTML has the dark class */
             html.dark body {
                 background-color: #0f172a !important; /* slate-900 */
                 color: #f1f5f9 !important; /* slate-100 */
+            }
+            
+            html.dark .bg-slate-900 {
+                background-color: #0f172a !important;
+            }
+            
+            html.dark .bg-slate-800 {
+                background-color: #1e293b !important;
+                border-color: #334155 !important;
+            }
+
+            html.dark .text-slate-100 {
+                color: #f1f5f9 !important;
+            }
+            
+            html.dark .text-slate-200 {
+                color: #e2e8f0 !important;
+            }
+            
+            html.dark .text-slate-400 {
+                color: #94a3b8 !important;
             }
         }
     </style>
@@ -338,10 +365,10 @@
 
         const TierGroup = ({ tier, children, isExpanded, toggle }) => {
             return (
-                <div className={`mb-6 rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-white dark:bg-slate-900 shadow-sm' : `${tier.bg}`} break-inside-avoid`}>
+                <div className={`mb-6 rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-white dark:bg-slate-900 shadow-sm' : `${tier.bg}`}`}>
                 <div 
                     onClick={toggle}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors break-after-avoid"
                 >
                     <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-full ${isExpanded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
