@@ -1,0 +1,606 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Check, Circle, Award, BookOpen, TrendingUp, Shield, GraduationCap, RotateCcw, Wallet, User, Target, ChevronDown, ChevronRight, Printer, Moon, Sun, FileText, Image as ImageIcon } from 'lucide-react';
+
+// --- Data Structure based on ASSA Roadmap & 2025 Fee Structure ---
+
+const SYLLABUS = {
+  foundation: {
+    id: 'A1',
+    title: 'A1: Foundation Technical',
+    color: 'bg-teal-600',
+    subjects: [
+      { code: 'A111', name: 'Actuarial Statistics', price: 9000 },
+      { code: 'A112', name: 'Business Economics', price: 7400 },
+      { code: 'A113', name: 'Business Finance', price: 7400 },
+    ]
+  },
+  intermediate: {
+    id: 'A2',
+    title: 'A2: Intermediate Technical',
+    color: 'bg-teal-700',
+    subjects: [
+      { code: 'A211', name: 'Financial Mathematics', price: 3380 },
+      { code: 'A212', name: 'Risk Modelling and Survival Analysis', price: 9000 },
+      { code: 'A213', name: 'Contingencies', price: 5080 },
+      { code: 'A214', name: 'Actuarial Economic Modelling', price: 9000 },
+    ]
+  },
+  risk: {
+    id: 'A3',
+    title: 'A3: Actuarial Risk Management',
+    color: 'bg-slate-700',
+    subjects: [
+      { code: 'A311', name: 'Actuarial Risk Management', price: 15490 },
+    ]
+  },
+  normative: {
+    id: 'N1-N3',
+    title: 'Normative Skills (Professional Practice)',
+    color: 'bg-slate-600',
+    subjects: [
+      { code: 'N111', name: 'Foundation APP (Modules 1-3)', price: 3280 },
+      { code: 'N211', name: 'Communications', price: 8180 },
+      { code: 'N311', name: 'Core APP (Modules 1-7)', price: 42400 },
+    ]
+  },
+  fellowship_principles: {
+    id: 'F1',
+    title: 'Part F1: Fellowship Principles (Select 2)',
+    subtitle: 'Note: F106 is required for CERA',
+    color: 'bg-red-700',
+    subjects: [
+      { code: 'F101', name: 'Health & Care Principles', price: 8180 },
+      { code: 'F102', name: 'Life Insurance Principles', price: 8180 },
+      { code: 'F103', name: 'General Insurance Principles', price: 8180 },
+      { code: 'F104', name: 'Retirement Benefits Principles', price: 8180 },
+      { code: 'F105', name: 'Finance & Investment Principles', price: 8180 },
+      { code: 'F106', name: 'Enterprise Risk Management', price: 10100 }, // Critical for CERA
+      { code: 'F107', name: 'Banking Principles', price: 8180 },
+      { code: 'F108', name: 'Health, Social & Employee Benefits', price: 8180 },
+    ]
+  },
+  fellowship_applications: {
+    id: 'F2',
+    title: 'Part F2: Fellowship Applications (Select 1)',
+    color: 'bg-red-800',
+    subjects: [
+      { code: 'F201', name: 'Health & Care Applications', price: 8660 },
+      { code: 'F202', name: 'Life Insurance Applications', price: 8660 },
+      { code: 'F203', name: 'General Insurance Applications', price: 8660 },
+      { code: 'F204', name: 'Retirement & Related Benefits', price: 8660 },
+      { code: 'F205', name: 'Investment Applications', price: 8660 },
+      { code: 'F207', name: 'Banking Applications', price: 8660 },
+    ]
+  },
+  normative_fellow: {
+    id: 'N4',
+    title: 'N4: Fellowship Professional Practice',
+    color: 'bg-red-600',
+    subjects: [
+      { code: 'N411', name: 'Fellowship APP', price: 15910 },
+    ]
+  }
+};
+
+const TIERS = [
+  {
+    id: 'TASSA',
+    title: 'TASSA (Technical Member)',
+    description: 'Foundation & Intermediate Technical',
+    keys: ['foundation', 'intermediate'],
+    color: 'border-teal-500',
+    bg: 'bg-teal-50 dark:bg-teal-900/20'
+  },
+  {
+    id: 'AMASSA',
+    title: 'AMASSA (Associate Member)',
+    description: 'Core Principles & Normative Skills',
+    keys: ['risk', 'normative'],
+    color: 'border-indigo-500',
+    bg: 'bg-indigo-50 dark:bg-indigo-900/20'
+  },
+  {
+    id: 'FASSA',
+    title: 'FASSA & CERA (Fellow)',
+    description: 'Fellowship Principles & Applications',
+    keys: ['fellowship_principles', 'fellowship_applications', 'normative_fellow'],
+    color: 'border-red-500',
+    bg: 'bg-red-50 dark:bg-red-900/20'
+  }
+];
+
+// --- Components ---
+
+const ProgressBar = ({ percentage, color = "bg-blue-600" }) => (
+  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2 print:border print:border-slate-300 print:bg-white">
+    <div 
+      className={`h-2.5 rounded-full transition-all duration-500 ease-out ${color} print:bg-slate-800`} 
+      style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
+    ></div>
+  </div>
+);
+
+const CircularProgress = ({ percentage, label, icon: Icon, subLabel, colorClass }) => {
+  const radius = 35;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-md transition-all print:shadow-none print:border-slate-300 print:p-2">
+      <div className="relative w-24 h-24 mb-3 print:mb-1 print:w-16 print:h-16">
+        {/* Background Circle */}
+        <svg className="w-full h-full transform -rotate-90">
+          <circle
+            cx="48"
+            cy="48"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            className="text-gray-100 dark:text-slate-700 print:text-slate-200"
+          />
+          {/* Progress Circle */}
+          <circle
+            cx="48"
+            cy="48"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className={`${colorClass} transition-all duration-1000 ease-out print:text-slate-800`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg print:text-black print:text-sm">
+          {Math.round(percentage)}%
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 mb-1 print:mb-0">
+        <Icon size={18} className="text-slate-500 dark:text-slate-400 print:hidden" />
+        <h3 className="font-bold text-slate-800 dark:text-slate-200 print:text-black print:text-sm">{label}</h3>
+      </div>
+      {subLabel && <p className="text-xs text-slate-500 dark:text-slate-400 print:hidden">{subLabel}</p>}
+    </div>
+  );
+};
+
+const SubjectCard = ({ subject, isCompleted, toggleSubject, color }) => {
+  // Highlight A213 if not completed
+  const isNextGoal = subject.code === 'A213' && !isCompleted;
+
+  return (
+    <div 
+      onClick={() => toggleSubject(subject.code)}
+      className={`
+        cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between
+        print:break-inside-avoid print:shadow-none print:border-slate-400
+        ${isCompleted 
+          ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-100 print:bg-slate-100 print:border-slate-400' 
+          : isNextGoal 
+            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600 shadow-md ring-1 ring-amber-200 dark:ring-amber-700 print:border-slate-600'
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-sm'
+        }
+      `}
+    >
+      {isNextGoal && (
+        <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1 print:bg-slate-800">
+           <Target size={10} /> NEXT GOAL
+        </div>
+      )}
+
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-bold px-2 py-1 rounded print:border print:border-slate-600 print:text-black ${isCompleted ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : `${color} text-white print:bg-white`}`}>
+              {subject.code}
+            </span>
+          </div>
+          <h4 className={`mt-2 text-sm font-medium ${isCompleted ? 'text-slate-500 dark:text-slate-500 line-through print:text-slate-500' : 'text-slate-800 dark:text-slate-100 print:text-black'}`}>
+            {subject.name}
+          </h4>
+        </div>
+        
+        <div className={`
+          w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
+          print:border-slate-800
+          ${isCompleted ? 'bg-green-500 border-green-500 print:bg-slate-800' : 'border-slate-300 dark:border-slate-600 group-hover:border-blue-400'}
+        `}>
+          {isCompleted && <Check size={14} className="text-white print:text-white" />}
+        </div>
+      </div>
+      
+      <div className={`mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-xs flex justify-between items-center print:border-slate-300 ${isCompleted ? 'text-slate-400 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400 print:text-slate-600'}`}>
+        <span>2025 Fee</span>
+        <span className="font-mono font-semibold">R {subject.price.toLocaleString()}</span>
+      </div>
+    </div>
+  );
+};
+
+const Section = ({ data, completedSubjects, toggleSubject }) => {
+  const total = data.subjects.length;
+  const completedCount = data.subjects.filter(s => completedSubjects.includes(s.code)).length;
+  const progress = (completedCount / total) * 100;
+
+  return (
+    <div className="mb-8 print:break-inside-avoid">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 print:text-black">
+            <span className={`w-3 h-3 rounded-full ${data.color} print:bg-slate-800`}></span>
+            {data.title}
+          </h2>
+          {data.subtitle && <p className="text-sm text-slate-500 dark:text-slate-400 ml-5 print:text-slate-600">{data.subtitle}</p>}
+        </div>
+        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 print:text-black">{completedCount}/{total}</span>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 print:grid-cols-4 print:gap-3">
+        {data.subjects.map(subject => (
+          <SubjectCard 
+            key={subject.code}
+            subject={subject}
+            isCompleted={completedSubjects.includes(subject.code)}
+            toggleSubject={toggleSubject}
+            color={data.color}
+          />
+        ))}
+      </div>
+      <div className="print:hidden">
+        <ProgressBar percentage={progress} color={data.color.replace('bg-', 'bg-opacity-80 bg-')} />
+      </div>
+    </div>
+  );
+};
+
+const TierGroup = ({ tier, children, isExpanded, toggle }) => {
+  return (
+    <div className={`mb-6 rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-white dark:bg-slate-900 shadow-sm' : `${tier.bg}`} print:bg-transparent print:shadow-none`}>
+      <div 
+        onClick={toggle}
+        className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors print:hidden"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full ${isExpanded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
+             {isExpanded ? <ChevronDown size={20} className="text-slate-600 dark:text-slate-300"/> : <ChevronRight size={20} className="text-slate-600 dark:text-slate-300"/>}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{tier.title}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{tier.description}</p>
+          </div>
+        </div>
+        <div className="text-xs font-bold px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+          {isExpanded ? 'View Less' : 'View Subjects'}
+        </div>
+      </div>
+      
+      {/* Print Header - Always Visible in Print */}
+      <div className="hidden print:block p-4 border-b border-slate-300">
+         <h2 className="text-xl font-bold text-black">{tier.title}</h2>
+         <p className="text-sm text-slate-600">{tier.description}</p>
+      </div>
+
+      {(isExpanded || window.matchMedia('print').matches) && (
+        <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 print:border-none print:block">
+          {children}
+        </div>
+      )}
+      
+      {/* Hidden container to force content to be visible during print even if collapsed in UI */}
+      {!isExpanded && (
+        <div className="hidden print:block p-4">
+           {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function App() {
+  const [completedSubjects, setCompletedSubjects] = useState(() => {
+    const saved = localStorage.getItem('assa-tracker-v1');
+    if (saved) return JSON.parse(saved);
+    return ['A211', 'N111']; 
+  });
+
+  // State for Dark Mode
+  const [darkMode, setDarkMode] = useState(false);
+
+  // State for Section Toggles - Default TASSA open, others closed
+  const [expandedTiers, setExpandedTiers] = useState({
+    TASSA: true,
+    AMASSA: false,
+    FASSA: false
+  });
+
+  useEffect(() => {
+    localStorage.setItem('assa-tracker-v1', JSON.stringify(completedSubjects));
+  }, [completedSubjects]);
+
+  // Apply dark mode class to html element
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  const toggleSubject = (code) => {
+    setCompletedSubjects(prev => 
+      prev.includes(code) 
+        ? prev.filter(c => c !== code)
+        : [...prev, code]
+    );
+  };
+
+  const toggleTier = (id) => {
+    setExpandedTiers(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  const handleReset = () => {
+    if(window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
+      setCompletedSubjects(['A211', 'N111']);
+    }
+  }
+
+  const handlePrint = (orientation) => {
+    const styleId = 'print-orientation-style';
+    let style = document.getElementById(styleId);
+    
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+
+    style.innerHTML = `@page { size: ${orientation}; }`;
+
+    // Wait slightly for DOM update then focus and print
+    // This is often required for iframes/sandboxes
+    setTimeout(() => {
+      try {
+        window.focus();
+        window.print();
+      } catch (e) {
+        alert("Browser blocked print command. Please press Ctrl+P or Cmd+P to print.");
+      }
+    }, 50);
+  };
+
+  // --- Calculations ---
+
+  const stats = useMemo(() => {
+    const has = (code) => completedSubjects.includes(code);
+    const countCompleted = (list) => list.filter(s => has(s.code)).length;
+
+    // Progress Calculations
+    const a1Total = SYLLABUS.foundation.subjects.length;
+    const a2Total = SYLLABUS.intermediate.subjects.length;
+    const a1Done = countCompleted(SYLLABUS.foundation.subjects);
+    const a2Done = countCompleted(SYLLABUS.intermediate.subjects);
+    const n111Done = has('N111') ? 1 : 0;
+    
+    const tassaTotalItems = a1Total + a2Total + 1; 
+    const tassaDoneItems = a1Done + a2Done + n111Done;
+    const tassaProgress = (tassaDoneItems / tassaTotalItems) * 100;
+
+    const a3Done = countCompleted(SYLLABUS.risk.subjects);
+    const n2n3Done = (has('N211') ? 1 : 0) + (has('N311') ? 1 : 0);
+    const amassaTotalItems = tassaTotalItems + 1 + 2; 
+    const amassaDoneItems = tassaDoneItems + a3Done + n2n3Done;
+    const amassaProgress = (amassaDoneItems / amassaTotalItems) * 100;
+
+    const f1Count = countCompleted(SYLLABUS.fellowship_principles.subjects);
+    const f2Count = countCompleted(SYLLABUS.fellowship_applications.subjects);
+    const n4Done = has('N411') ? 1 : 0;
+
+    const effectiveF1 = Math.min(f1Count, 2);
+    const effectiveF2 = Math.min(f2Count, 1);
+
+    const fassaTotalItems = amassaTotalItems + 2 + 1 + 1; 
+    const fassaDoneItems = amassaDoneItems + effectiveF1 + effectiveF2 + n4Done;
+    const fassaProgress = (fassaDoneItems / fassaTotalItems) * 100;
+
+    const hasF106 = has('F106');
+    const ceraTotalItems = amassaTotalItems + 1; 
+    const ceraDoneItems = amassaDoneItems + (hasF106 ? 1 : 0);
+    const ceraProgress = (ceraDoneItems / ceraTotalItems) * 100;
+
+    // Financial Calculations
+    let totalCost = 0;
+    let paidCost = 0;
+    let remainingCost = 0;
+
+    const allSections = [
+      SYLLABUS.foundation, SYLLABUS.intermediate, SYLLABUS.risk, SYLLABUS.normative, 
+      SYLLABUS.fellowship_principles, SYLLABUS.fellowship_applications, SYLLABUS.normative_fellow
+    ];
+
+    allSections.forEach(section => {
+      section.subjects.forEach(subject => {
+        if (has(subject.code)) {
+          paidCost += subject.price;
+        } else {
+          if (section.id === 'F1' && f1Count >= 2) return; 
+          if (section.id === 'F2' && f2Count >= 1) return;
+          remainingCost += subject.price;
+        }
+      });
+    });
+
+    return {
+      tassa: tassaProgress,
+      amassa: amassaProgress,
+      fassa: fassaProgress,
+      cera: ceraProgress,
+      f1Count,
+      f2Count,
+      remainingCost
+    };
+  }, [completedSubjects]);
+
+  return (
+    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'} print:bg-white`}>
+      
+      {/* Print/Theme Controls - Floating or Fixed */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 print:hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 flex flex-col gap-2">
+           <button 
+             onClick={() => setDarkMode(!darkMode)}
+             className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+             title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+           >
+             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+           </button>
+           <hr className="border-slate-200 dark:border-slate-700" />
+           <button 
+             onClick={() => handlePrint('portrait')}
+             className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2"
+             title="Print Portrait"
+           >
+             <FileText size={20} />
+           </button>
+           <button 
+             onClick={() => handlePrint('landscape')}
+             className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2"
+             title="Print Landscape"
+           >
+             <ImageIcon size={20} className="transform rotate-90" />
+           </button>
+        </div>
+      </div>
+
+      {/* Header */}
+      <header className="bg-slate-900 text-white pt-12 pb-24 px-6 relative overflow-hidden shrink-0 print:bg-white print:text-black print:pt-4 print:pb-4 print:border-b-2 print:border-slate-900">
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+               <div className="flex items-center gap-2 mb-2">
+                 <div className="bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full text-xs font-bold border border-teal-500/30 flex items-center gap-2 print:bg-transparent print:border-slate-400 print:text-slate-800">
+                    <User size={12} />
+                    <span>ENOCK</span>
+                    <span className="w-1 h-1 bg-teal-500 rounded-full print:bg-slate-800"></span>
+                    <span>KAZE00002</span>
+                 </div>
+               </div>
+               <h1 className="text-3xl md:text-4xl font-bold mb-2 print:text-2xl">Actuarial Qualification Roadmap</h1>
+               <p className="text-slate-400 print:text-slate-600">Track your journey from Student to Fellow of the ASSA.</p>
+            </div>
+            <div className="flex flex-col items-end gap-2 print:hidden">
+              <button 
+                onClick={handleReset}
+                className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors"
+                title="Reset Progress"
+              >
+                <RotateCcw size={12} /> Reset Data
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Decorative Background Elements - Hidden in Print */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2 animate-blob print:hidden"></div>
+        <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2 animate-blob animation-delay-2000 print:hidden"></div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 -mt-16 relative z-20 flex-grow w-full print:mt-6 print:px-0">
+        
+        {/* Milestone Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-12 print:grid-cols-5 print:gap-2 print:mb-8">
+          <CircularProgress 
+            percentage={stats.tassa} 
+            label="TASSA" 
+            subLabel="Technically Advanced"
+            icon={BookOpen}
+            colorClass="text-teal-500"
+          />
+          <CircularProgress 
+            percentage={stats.amassa} 
+            label="AMASSA" 
+            subLabel="Associate"
+            icon={Award}
+            colorClass="text-indigo-500"
+          />
+          <CircularProgress 
+            percentage={stats.fassa} 
+            label="FASSA" 
+            subLabel="Fellow"
+            icon={GraduationCap}
+            colorClass="text-red-600"
+          />
+          <CircularProgress 
+            percentage={stats.cera} 
+            label="CERA" 
+            subLabel="Risk Actuary"
+            icon={Shield}
+            colorClass="text-emerald-600"
+          />
+           <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg border border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-xl transition-shadow relative overflow-hidden print:bg-white print:border-slate-300 print:text-black print:shadow-none print:p-2">
+             <div className="relative z-10">
+               <Wallet size={24} className="text-teal-400 mb-2 mx-auto print:text-slate-800 print:hidden" />
+               <p className="text-xs text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">Est. Remaining Cost</p>
+               <h3 className="text-2xl font-bold text-white print:text-black print:text-lg">R {stats.remainingCost.toLocaleString()}</h3>
+               <p className="text-[10px] text-slate-500 mt-2 print:hidden">Based on 2025 Member Fees</p>
+             </div>
+             <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-teal-500 rounded-full blur-2xl opacity-20 print:hidden"></div>
+          </div>
+        </div>
+
+        {/* Detailed Modules - Grouped by Tier */}
+        <div className="space-y-4">
+          
+          {TIERS.map(tier => (
+            <TierGroup 
+              key={tier.id} 
+              tier={tier} 
+              isExpanded={expandedTiers[tier.id]} 
+              toggle={() => toggleTier(tier.id)}
+            >
+              {tier.keys.map(key => {
+                 // Special logic for rendering specific headers inside the Fellowship block
+                 const isFellowshipLogic = tier.id === 'FASSA' && key === 'fellowship_principles';
+                 
+                 return (
+                   <React.Fragment key={key}>
+                      {isFellowshipLogic && (
+                        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-lg flex items-center gap-3 print:break-inside-avoid">
+                           <TrendingUp className="text-red-500 dark:text-red-400 print:text-slate-800" />
+                           <div>
+                             <h3 className="font-bold text-red-900 dark:text-red-200 print:text-black">Fellowship Requirements</h3>
+                             <p className="text-sm text-red-700 dark:text-red-300 print:text-slate-600">
+                               You have selected <span className="font-bold">{stats.f1Count}</span> Principles (Need 2) and <span className="font-bold">{stats.f2Count}</span> Applications (Need 1).
+                             </p>
+                           </div>
+                        </div>
+                      )}
+                      
+                      <Section 
+                        data={SYLLABUS[key]} 
+                        completedSubjects={completedSubjects} 
+                        toggleSubject={toggleSubject} 
+                      />
+                   </React.Fragment>
+                 )
+              })}
+            </TierGroup>
+          ))}
+
+        </div>
+      </main>
+
+      <footer className="text-center text-slate-400 dark:text-slate-500 py-10 text-sm mt-auto bg-slate-900/5 dark:bg-black/20 print:bg-white print:text-black print:py-4">
+        <div className="max-w-6xl mx-auto px-6">
+          <p className="font-semibold">2025 © Kazembe CodeWorks. All rights reserved.</p>
+          <p className="text-xs text-slate-300 dark:text-slate-600 mt-1 opacity-60 print:hidden">Fees are estimates based on 2025 Member rates and subject to change.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
