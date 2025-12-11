@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Track your journey from Student to Fellow of the ASSA.">
+    <meta name="theme-color" content="#0f172a">
     <title>ASSA Qualification Roadmap</title>
     
     <!-- Tailwind CSS -->
@@ -40,53 +42,37 @@
     <style>
         /* Print Configuration */
         @media print {
-            /* Force browser to render background colors/images */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-
-            /* Hide elements marked as no-print */
             .no-print { display: none !important; }
-
-            /* Page Break Logic */
             .break-inside-avoid {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
-            
             .break-after-avoid {
                 break-after: avoid;
                 page-break-after: avoid;
             }
-
-            /* Dark Mode Print Overrides */
-            /* We explicitly force the dark colors in print if the HTML has the dark class */
             html.dark body {
-                background-color: #0f172a !important; /* slate-900 */
-                color: #f1f5f9 !important; /* slate-100 */
-            }
-            
-            html.dark .bg-slate-900 {
                 background-color: #0f172a !important;
+                color: #f1f5f9 !important;
             }
-            
-            html.dark .bg-slate-800 {
+            html.dark .bg-slate-900 { background-color: #0f172a !important; }
+            html.dark .bg-slate-800 { 
                 background-color: #1e293b !important;
                 border-color: #334155 !important;
             }
+            html.dark .text-slate-100 { color: #f1f5f9 !important; }
+            html.dark .text-slate-200 { color: #e2e8f0 !important; }
+            html.dark .text-slate-400 { color: #94a3b8 !important; }
+        }
 
-            html.dark .text-slate-100 {
-                color: #f1f5f9 !important;
-            }
-            
-            html.dark .text-slate-200 {
-                color: #e2e8f0 !important;
-            }
-            
-            html.dark .text-slate-400 {
-                color: #94a3b8 !important;
-            }
+        /* Focus Ring Helper for Accessibility */
+        .focus-visible-ring:focus-visible {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
         }
     </style>
 </head>
@@ -94,7 +80,15 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, Fragment } = React;
+        const { useState, useEffect, useMemo, useRef, Fragment } = React;
+
+        // --- CONSTANTS ---
+        const CONFIG = {
+            CURRENCY: 'R',
+            YEAR: 2025,
+            APP_NAME: 'ASSA Tracker',
+            VERSION: '2.0.0'
+        };
 
         // --- Icons (Inlined for Standalone Deployment) ---
         const Icon = ({ path, size = 24, className = "" }) => (
@@ -109,6 +103,7 @@
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
                 className={className}
+                aria-hidden="true"
             >
                 {path}
             </svg>
@@ -131,7 +126,9 @@
             Moon: (props) => <Icon {...props} path={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />} />,
             Sun: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>} />,
             FileText: (props) => <Icon {...props} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></>} />,
-            ImageIcon: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>} />
+            ImageIcon: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>} />,
+            Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>} />,
+            Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />
         };
 
         // --- Data Structure ---
@@ -241,9 +238,72 @@
             }
         ];
 
-        // --- App Component ---
+        // --- Utility to Draw and Download Icons ---
+        const downloadIcon = (size, bgColor) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Draw Background
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw Simple Logo (Rising Graph + Checkmark)
+            const padding = size * 0.2;
+            const drawSize = size - (padding * 2);
+            
+            ctx.translate(padding, padding);
+            
+            // Graph Bars
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, drawSize * 0.6, drawSize * 0.2, drawSize * 0.4);
+            ctx.fillRect(drawSize * 0.4, drawSize * 0.4, drawSize * 0.2, drawSize * 0.6);
+            
+            // Checkmark overlay
+            ctx.strokeStyle = '#22c55e'; // Green
+            ctx.lineWidth = size * 0.1;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(drawSize * 0.6, drawSize * 0.6);
+            ctx.lineTo(drawSize * 0.8, drawSize * 0.8);
+            ctx.lineTo(drawSize * 1.1, drawSize * 0.2);
+            ctx.stroke();
+
+            // Convert and Download
+            const link = document.createElement('a');
+            link.download = `assa-tracker-icon-${size}x${size}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        const generateManifest = () => {
+             // Basic Manifest for PWA
+             const manifest = {
+                name: CONFIG.APP_NAME,
+                short_name: "ASSA",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#0f172a",
+                theme_color: "#0f172a",
+                icons: [
+                    { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+                    { src: "icon-512.png", sizes: "512x512", type: "image/png" }
+                ]
+            };
+            // In a real file serve, we'd reference real files. 
+            // For single-file, we just log this object or could blob it, 
+            // but the browser needs real URLs for install. 
+            // We focus on the Icon Download feature instead.
+            return manifest;
+        };
+
+
+        // --- App Components ---
+
         const ProgressBar = ({ percentage, color = "bg-blue-600" }) => (
-            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2 border border-slate-300 dark:border-slate-600">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2 border border-slate-300 dark:border-slate-600" role="progressbar" aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">
                 <div 
                 className={`h-2.5 rounded-full transition-all duration-500 ease-out ${color}`} 
                 style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
@@ -258,12 +318,12 @@
 
             return (
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-md transition-all break-inside-avoid">
-                    <div className="relative w-24 h-24 mb-3">
+                    <div className="relative w-24 h-24 mb-3" role="graphics-symbol" aria-label={`Progress chart for ${label}: ${Math.round(percentage)}%`}>
                         <svg className="w-full h-full transform -rotate-90">
                             <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100 dark:text-slate-700" />
                             <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className={`${colorClass} transition-all duration-1000 ease-out`} strokeLinecap="round" />
                         </svg>
-                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg">
+                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg" aria-hidden="true">
                             {Math.round(percentage)}%
                         </div>
                     </div>
@@ -280,49 +340,62 @@
         const SubjectCard = ({ subject, isCompleted, toggleSubject, color }) => {
             const isNextGoal = subject.code === 'A213' && !isCompleted;
 
+            // Accessibility: Handle Enter/Space for keyboard users
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault(); // Prevent page scroll on Space
+                    toggleSubject(subject.code);
+                }
+            };
+
             return (
                 <div 
-                onClick={() => toggleSubject(subject.code)}
-                className={`
-                    cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between break-inside-avoid
-                    ${isCompleted 
-                    ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-100' 
-                    : isNextGoal 
-                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600 shadow-md ring-1 ring-amber-200 dark:ring-amber-700'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-sm'
-                    }
-                `}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isCompleted}
+                    aria-label={`${subject.name} (${subject.code}). Cost: ${CONFIG.CURRENCY} ${subject.price}. ${isCompleted ? 'Completed' : 'Not completed'}`}
+                    onClick={() => toggleSubject(subject.code)}
+                    onKeyDown={handleKeyDown}
+                    className={`
+                        cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between break-inside-avoid focus-visible-ring
+                        ${isCompleted 
+                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-100' 
+                        : isNextGoal 
+                            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600 shadow-md ring-1 ring-amber-200 dark:ring-amber-700'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-sm'
+                        }
+                    `}
                 >
-                {isNextGoal && (
-                    <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
-                    <Icons.Target size={10} /> NEXT GOAL
-                    </div>
-                )}
+                    {isNextGoal && (
+                        <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                        <Icons.Target size={10} /> NEXT GOAL
+                        </div>
+                    )}
 
-                <div className="flex items-start justify-between">
-                    <div>
-                    <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-2 py-1 rounded border border-transparent ${isCompleted ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : `${color} text-white`}`}>
-                        {subject.code}
-                        </span>
-                    </div>
-                    <h4 className={`mt-2 text-sm font-medium ${isCompleted ? 'text-slate-500 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
-                        {subject.name}
-                    </h4>
+                    <div className="flex items-start justify-between">
+                        <div>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold px-2 py-1 rounded border border-transparent ${isCompleted ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : `${color} text-white`}`}>
+                            {subject.code}
+                            </span>
+                        </div>
+                        <h4 className={`mt-2 text-sm font-medium ${isCompleted ? 'text-slate-500 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
+                            {subject.name}
+                        </h4>
+                        </div>
+                        
+                        <div className={`
+                        w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
+                        ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-blue-400'}
+                        `}>
+                        {isCompleted && <Icons.Check size={14} className="text-white" />}
+                        </div>
                     </div>
                     
-                    <div className={`
-                    w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
-                    ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-blue-400'}
-                    `}>
-                    {isCompleted && <Icons.Check size={14} className="text-white" />}
+                    <div className={`mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-xs flex justify-between items-center ${isCompleted ? 'text-slate-400 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <span>{CONFIG.YEAR} Fee</span>
+                        <span className="font-mono font-semibold">{CONFIG.CURRENCY} {subject.price.toLocaleString()}</span>
                     </div>
-                </div>
-                
-                <div className={`mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-xs flex justify-between items-center ${isCompleted ? 'text-slate-400 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
-                    <span>2025 Fee</span>
-                    <span className="font-mono font-semibold">R {subject.price.toLocaleString()}</span>
-                </div>
                 </div>
             );
         };
@@ -364,11 +437,24 @@
         };
 
         const TierGroup = ({ tier, children, isExpanded, toggle }) => {
+             // Accessibility: Handle Enter/Space for keyboard users
+             const handleKeyDown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggle();
+                }
+            };
+
             return (
                 <div className={`mb-6 rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-white dark:bg-slate-900 shadow-sm' : `${tier.bg}`}`}>
                 <div 
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-label={`Toggle ${tier.title}`}
                     onClick={toggle}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors break-after-avoid"
+                    onKeyDown={handleKeyDown}
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors break-after-avoid focus-visible-ring outline-none"
                 >
                     <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-full ${isExpanded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
@@ -393,6 +479,74 @@
             );
         };
 
+        const SettingsPanel = ({ isOpen, onClose, onReset, darkMode, setDarkMode }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in no-print" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold dark:text-white">Settings & Tools</h2>
+                            <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                                <Icons.Check size={20} className="transform rotate-45 text-slate-500" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Appearance</h3>
+                                <button 
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                >
+                                    <span className="flex items-center gap-2 dark:text-slate-200">
+                                        {darkMode ? <Icons.Moon size={18} /> : <Icons.Sun size={18} />}
+                                        {darkMode ? 'Dark Mode Active' : 'Light Mode Active'}
+                                    </span>
+                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded dark:text-slate-400">SWITCH</span>
+                                </button>
+                            </div>
+
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Build Assets</h3>
+                                <p className="text-xs text-slate-400 mb-3">Generate icons for PWA manifest or home screen.</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={() => downloadIcon(192, '#0f172a')}
+                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:border-teal-200 transition-all text-sm font-medium dark:text-slate-300"
+                                    >
+                                        <Icons.Download size={20} className="mb-2 text-teal-500" />
+                                        192x192 Icon
+                                    </button>
+                                    <button 
+                                        onClick={() => downloadIcon(512, '#0f172a')}
+                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:border-teal-200 transition-all text-sm font-medium dark:text-slate-300"
+                                    >
+                                        <Icons.Download size={20} className="mb-2 text-teal-500" />
+                                        512x512 Icon
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                <button 
+                                    onClick={onReset}
+                                    className="w-full p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2 font-medium"
+                                >
+                                    <Icons.RotateCcw size={18} />
+                                    Reset All Progress
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 text-center text-xs text-slate-400">
+                            Version {CONFIG.VERSION}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         function App() {
             const [completedSubjects, setCompletedSubjects] = useState(() => {
                 const saved = localStorage.getItem('assa-tracker-v1');
@@ -401,26 +555,38 @@
             });
 
             const [darkMode, setDarkMode] = useState(false);
+            const [showSettings, setShowSettings] = useState(false);
             const [expandedTiers, setExpandedTiers] = useState({
                 TASSA: true,
                 AMASSA: false,
                 FASSA: false
             });
 
+            // Initialize PWA manifest on load
+            useEffect(() => {
+                // In a real build step we would output a file, but for a single file app
+                // we can't easily auto-inject a manifest.json link without a server.
+                // The icons are provided via the Settings panel for manual download.
+            }, []);
+
             useEffect(() => {
                 localStorage.setItem('assa-tracker-v1', JSON.stringify(completedSubjects));
             }, [completedSubjects]);
 
-            // Sync dark mode to HTML tag for Tailwind
+            // Sync dark mode
             useEffect(() => {
+                const root = document.documentElement;
                 if (darkMode) {
-                    document.documentElement.classList.add('dark');
+                    root.classList.add('dark');
                     document.body.classList.add('bg-slate-900', 'text-slate-100');
                     document.body.classList.remove('bg-slate-50', 'text-slate-900');
+                    // Update theme color meta tag
+                    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
                 } else {
-                    document.documentElement.classList.remove('dark');
+                    root.classList.remove('dark');
                     document.body.classList.remove('bg-slate-900', 'text-slate-100');
                     document.body.classList.add('bg-slate-50', 'text-slate-900');
+                    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f8fafc');
                 }
             }, [darkMode]);
 
@@ -436,7 +602,8 @@
 
             const handleReset = () => {
                 if(window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
-                setCompletedSubjects(['A211', 'N111']);
+                    setCompletedSubjects(['A211', 'N111']);
+                    setShowSettings(false);
                 }
             }
 
@@ -526,27 +693,38 @@
             return (
                 <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                 
-                <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 no-print">
+                <SettingsPanel 
+                    isOpen={showSettings} 
+                    onClose={() => setShowSettings(false)}
+                    onReset={handleReset}
+                    darkMode={darkMode}
+                    setDarkMode={setDarkMode}
+                />
+
+                <div className="fixed top-4 right-4 z-40 flex flex-col gap-2 no-print">
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 flex flex-col gap-2">
                     <button 
-                        onClick={() => setDarkMode(!darkMode)}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-                        title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                        onClick={() => setShowSettings(true)}
+                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors focus-visible-ring"
+                        title="Open Settings"
+                        aria-label="Open Settings and Tools"
                     >
-                        {darkMode ? <Icons.Sun size={20} /> : <Icons.Moon size={20} />}
+                        <Icons.Settings size={20} />
                     </button>
                     <hr className="border-slate-200 dark:border-slate-700" />
                     <button 
                         onClick={() => handlePrint('portrait')}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2"
+                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2 focus-visible-ring"
                         title="Print Portrait"
+                        aria-label="Print in Portrait Mode"
                     >
                         <Icons.FileText size={20} />
                     </button>
                     <button 
                         onClick={() => handlePrint('landscape')}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2"
+                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2 focus-visible-ring"
                         title="Print Landscape"
+                        aria-label="Print in Landscape Mode"
                     >
                         <Icons.ImageIcon size={20} className="transform rotate-90" />
                     </button>
@@ -565,17 +743,8 @@
                                 <span>KAZE00002</span>
                             </div>
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-bold mb-2 print:text-2xl">Actuarial Qualification Roadmap</h1>
+                        <h1 className="text-3xl md:text-4xl font-bold mb-2 print:text-2xl">{CONFIG.APP_NAME}</h1>
                         <p className="text-slate-400 print:text-slate-600">Track your journey from Student to Fellow of the ASSA.</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2 no-print">
-                        <button 
-                            onClick={handleReset}
-                            className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors"
-                            title="Reset Progress"
-                        >
-                            <Icons.RotateCcw size={12} /> Reset Data
-                        </button>
                         </div>
                     </div>
                     </div>
@@ -595,8 +764,8 @@
                         <div className="relative z-10">
                         <Icons.Wallet size={24} className="text-teal-400 mb-2 mx-auto print:text-slate-800 no-print" />
                         <p className="text-xs text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">Est. Remaining Cost</p>
-                        <h3 className="text-2xl font-bold text-white print:text-black print:text-lg">R {stats.remainingCost.toLocaleString()}</h3>
-                        <p className="text-[10px] text-slate-500 mt-2 no-print">Based on 2025 Member Fees</p>
+                        <h3 className="text-2xl font-bold text-white print:text-black print:text-lg">{CONFIG.CURRENCY} {stats.remainingCost.toLocaleString()}</h3>
+                        <p className="text-[10px] text-slate-500 mt-2 no-print">Based on {CONFIG.YEAR} Member Fees</p>
                         </div>
                         <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-teal-500 rounded-full blur-2xl opacity-20 no-print"></div>
                     </div>
@@ -631,8 +800,8 @@
 
                 <footer className="text-center text-slate-400 dark:text-slate-500 py-10 text-sm mt-auto bg-slate-900/5 dark:bg-black/20 print:py-4">
                     <div className="max-w-6xl mx-auto px-6">
-                    <p className="font-semibold">2025 © Kazembe CodeWorks. All rights reserved.</p>
-                    <p className="text-xs text-slate-300 dark:text-slate-600 mt-1 opacity-60 no-print">Fees are estimates based on 2025 Member rates and subject to change.</p>
+                    <p className="font-semibold">{CONFIG.YEAR} © Kazembe CodeWorks. All rights reserved.</p>
+                    <p className="text-xs text-slate-300 dark:text-slate-600 mt-1 opacity-60 no-print">Fees are estimates based on {CONFIG.YEAR} Member rates and subject to change.</p>
                     </div>
                 </footer>
                 </div>
