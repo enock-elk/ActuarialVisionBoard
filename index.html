@@ -6,6 +6,11 @@
     <meta name="description" content="Track your journey from Student to Fellow of the ASSA.">
     <meta name="theme-color" content="#0f172a">
     <title>ASSA Qualification Roadmap</title>
+
+    <!-- App Icons (from GitHub Repository) -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/assa-tracker-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/assa-tracker-icon-512x512.png">
+    <link rel="apple-touch-icon" href="icons/assa-tracker-icon-192x192.png">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,7 +92,7 @@
             CURRENCY: 'R',
             YEAR: 2025,
             APP_NAME: 'ASSA Tracker',
-            VERSION: '2.0.0'
+            VERSION: '2.1.0'
         };
 
         // --- Icons (Inlined for Standalone Deployment) ---
@@ -127,7 +132,6 @@
             Sun: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>} />,
             FileText: (props) => <Icon {...props} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></>} />,
             ImageIcon: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>} />,
-            Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>} />,
             Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />
         };
 
@@ -237,68 +241,6 @@
                 bg: 'bg-red-50 dark:bg-red-900/20'
             }
         ];
-
-        // --- Utility to Draw and Download Icons ---
-        const downloadIcon = (size, bgColor) => {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-
-            // Draw Background
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, size, size);
-
-            // Draw Simple Logo (Rising Graph + Checkmark)
-            const padding = size * 0.2;
-            const drawSize = size - (padding * 2);
-            
-            ctx.translate(padding, padding);
-            
-            // Graph Bars
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, drawSize * 0.6, drawSize * 0.2, drawSize * 0.4);
-            ctx.fillRect(drawSize * 0.4, drawSize * 0.4, drawSize * 0.2, drawSize * 0.6);
-            
-            // Checkmark overlay
-            ctx.strokeStyle = '#22c55e'; // Green
-            ctx.lineWidth = size * 0.1;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(drawSize * 0.6, drawSize * 0.6);
-            ctx.lineTo(drawSize * 0.8, drawSize * 0.8);
-            ctx.lineTo(drawSize * 1.1, drawSize * 0.2);
-            ctx.stroke();
-
-            // Convert and Download
-            const link = document.createElement('a');
-            link.download = `assa-tracker-icon-${size}x${size}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        };
-
-        const generateManifest = () => {
-             // Basic Manifest for PWA
-             const manifest = {
-                name: CONFIG.APP_NAME,
-                short_name: "ASSA",
-                start_url: ".",
-                display: "standalone",
-                background_color: "#0f172a",
-                theme_color: "#0f172a",
-                icons: [
-                    { src: "icon-192.png", sizes: "192x192", type: "image/png" },
-                    { src: "icon-512.png", sizes: "512x512", type: "image/png" }
-                ]
-            };
-            // In a real file serve, we'd reference real files. 
-            // For single-file, we just log this object or could blob it, 
-            // but the browser needs real URLs for install. 
-            // We focus on the Icon Download feature instead.
-            return manifest;
-        };
-
 
         // --- App Components ---
 
@@ -507,27 +449,6 @@
                                 </button>
                             </div>
 
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Build Assets</h3>
-                                <p className="text-xs text-slate-400 mb-3">Generate icons for PWA manifest or home screen.</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button 
-                                        onClick={() => downloadIcon(192, '#0f172a')}
-                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:border-teal-200 transition-all text-sm font-medium dark:text-slate-300"
-                                    >
-                                        <Icons.Download size={20} className="mb-2 text-teal-500" />
-                                        192x192 Icon
-                                    </button>
-                                    <button 
-                                        onClick={() => downloadIcon(512, '#0f172a')}
-                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:border-teal-200 transition-all text-sm font-medium dark:text-slate-300"
-                                    >
-                                        <Icons.Download size={20} className="mb-2 text-teal-500" />
-                                        512x512 Icon
-                                    </button>
-                                </div>
-                            </div>
-
                             <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
                                 <button 
                                     onClick={onReset}
@@ -561,13 +482,6 @@
                 AMASSA: false,
                 FASSA: false
             });
-
-            // Initialize PWA manifest on load
-            useEffect(() => {
-                // In a real build step we would output a file, but for a single file app
-                // we can't easily auto-inject a manifest.json link without a server.
-                // The icons are provided via the Settings panel for manual download.
-            }, []);
 
             useEffect(() => {
                 localStorage.setItem('assa-tracker-v1', JSON.stringify(completedSubjects));
