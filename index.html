@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Track your journey from Student to Fellow of the ASSA.">
     <meta name="theme-color" content="#0f172a">
     <title>ASSA Qualification Roadmap</title>
 
-    <!-- App Icons (from GitHub Repository) -->
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/assa-tracker-icon-192x192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/assa-tracker-icon-512x512.png">
     <link rel="apple-touch-icon" href="icons/assa-tracker-icon-192x192.png">
@@ -22,7 +23,7 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Tailwind Config for Dark Mode -->
+    <!-- Tailwind Config for Dark Mode & Animations -->
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -30,6 +31,8 @@
                 extend: {
                     animation: {
                         blob: "blob 7s infinite",
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
                     },
                     keyframes: {
                         blob: {
@@ -38,6 +41,14 @@
                             "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
                             "100%": { transform: "translate(0px, 0px) scale(1)" },
                         },
+                        slideUp: {
+                            "0%": { transform: "translateY(20px)", opacity: "0" },
+                            "100%": { transform: "translateY(0)", opacity: "1" },
+                        },
+                        fadeIn: {
+                            "0%": { opacity: "0" },
+                            "100%": { opacity: "1" },
+                        }
                     },
                 },
             },
@@ -52,66 +63,51 @@
                 print-color-adjust: exact !important;
             }
             .no-print { display: none !important; }
-            .break-inside-avoid {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-            .break-after-avoid {
-                break-after: avoid;
-                page-break-after: avoid;
-            }
-            html.dark body {
-                background-color: #0f172a !important;
-                color: #f1f5f9 !important;
-            }
-            html.dark .bg-slate-900 { background-color: #0f172a !important; }
-            html.dark .bg-slate-800 { 
-                background-color: #1e293b !important;
-                border-color: #334155 !important;
-            }
-            html.dark .text-slate-100 { color: #f1f5f9 !important; }
-            html.dark .text-slate-200 { color: #e2e8f0 !important; }
-            html.dark .text-slate-400 { color: #94a3b8 !important; }
+            .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+            .break-after-avoid { break-after: avoid; page-break-after: avoid; }
+            html.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
         }
 
-        /* Focus Ring Helper for Accessibility */
-        .focus-visible-ring:focus-visible {
-            outline: 2px solid #3b82f6;
-            outline-offset: 2px;
-        }
+        /* Prevent overscroll bounce on mobile */
+        body { overscroll-behavior-y: none; }
+        
+        /* Custom Scrollbar for Desktop */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        html.dark ::-webkit-scrollbar-thumb { background: #475569; }
     </style>
+
+    <!-- Register Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.error('Service Worker registration failed', err));
+            });
+        }
+    </script>
 </head>
-<body class="bg-slate-50 transition-colors duration-300">
+<body class="bg-slate-50 transition-colors duration-300 antialiased selection:bg-teal-500 selection:text-white">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef, Fragment } = React;
+        const { useState, useEffect, useMemo, Fragment } = React;
 
         // --- CONSTANTS ---
         const CONFIG = {
             CURRENCY: 'R',
-            YEAR: 2025,
+            YEAR: 2026,
             APP_NAME: 'ASSA Tracker',
-            VERSION: '2.1.0'
+            VERSION: '3.0.0-PWA'
         };
 
-        // --- Icons (Inlined for Standalone Deployment) ---
+        const CURRENT_TARGETS = ['A112', 'A213'];
+
+        // --- Icons ---
         const Icon = ({ path, size = 24, className = "" }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-                aria-hidden="true"
-            >
-                {path}
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{path}</svg>
         );
 
         const Icons = {
@@ -127,129 +123,110 @@
             Target: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>} />,
             ChevronDown: (props) => <Icon {...props} path={<polyline points="6 9 12 15 18 9" />} />,
             ChevronRight: (props) => <Icon {...props} path={<polyline points="9 18 15 12 9 6" />} />,
-            Printer: (props) => <Icon {...props} path={<><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>} />,
             Moon: (props) => <Icon {...props} path={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />} />,
             Sun: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>} />,
-            FileText: (props) => <Icon {...props} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></>} />,
-            ImageIcon: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>} />,
-            Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />
+            LayoutDashboard: (props) => <Icon {...props} path={<><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>} />,
+            Swords: (props) => <Icon {...props} path={<><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" y1="19" x2="19" y2="13" /><line x1="16" y1="16" x2="20" y2="20" /><line x1="19" y1="21" x2="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" y1="14" x2="9" y2="10" /><line x1="4" y1="17" x2="8" y2="21" /><line x1="3" y1="19" x2="5" y2="21" /></>} />,
+            Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />,
+            Calendar: (props) => <Icon {...props} path={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>} />,
+            Clock: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />
         };
 
-        // --- Data Structure ---
+        // --- Data Structure (Updated for 2026 Fees) ---
         const SYLLABUS = {
             foundation: {
-                id: 'A1',
-                title: 'A1: Foundation Technical',
-                color: 'bg-teal-600',
+                id: 'A1', title: 'A1: Foundation Technical', color: 'bg-teal-600',
                 subjects: [
-                { code: 'A111', name: 'Actuarial Statistics', price: 9000 },
-                { code: 'A112', name: 'Business Economics', price: 7400 },
-                { code: 'A113', name: 'Business Finance', price: 7400 },
+                    { code: 'A111', name: 'Actuarial Statistics', price: 9520 },
+                    { code: 'A112', name: 'Business Economics', price: 7800, note: "24 Sept | 2-hr Objective" },
+                    { code: 'A113', name: 'Business Finance', price: 7800 },
                 ]
             },
             intermediate: {
-                id: 'A2',
-                title: 'A2: Intermediate Technical',
-                color: 'bg-teal-700',
+                id: 'A2', title: 'A2: Intermediate Technical', color: 'bg-teal-700',
                 subjects: [
-                { code: 'A211', name: 'Financial Mathematics', price: 3380 },
-                { code: 'A212', name: 'Risk Modelling and Survival Analysis', price: 9000 },
-                { code: 'A213', name: 'Contingencies', price: 5080 },
-                { code: 'A214', name: 'Actuarial Economic Modelling', price: 9000 },
+                    { code: 'A211', name: 'Financial Mathematics', price: 3650 },
+                    { code: 'A212', name: 'Risk Modelling & Survival Analysis', price: 9520 },
+                    { code: 'A213', name: 'Contingencies', price: 5490, note: "7 Oct | Written + Computer" },
+                    { code: 'A214', name: 'Actuarial Economic Modelling', price: 9520 },
                 ]
             },
             risk: {
-                id: 'A3',
-                title: 'A3: Actuarial Risk Management',
-                color: 'bg-slate-700',
-                subjects: [
-                { code: 'A311', name: 'Actuarial Risk Management', price: 15490 },
-                ]
+                id: 'A3', title: 'A3: Actuarial Risk Management', color: 'bg-slate-700',
+                subjects: [ { code: 'A311', name: 'Actuarial Risk Management', price: 16420 } ]
             },
             normative: {
-                id: 'N1-N3',
-                title: 'Normative Skills (Professional Practice)',
-                color: 'bg-slate-600',
+                id: 'N1-N3', title: 'Normative Skills (Professional Practice)', color: 'bg-slate-600',
                 subjects: [
-                { code: 'N111', name: 'Foundation APP (Modules 1-3)', price: 3280 },
-                { code: 'N211', name: 'Communications', price: 8180 },
-                { code: 'N311', name: 'Core APP (Modules 1-7)', price: 42400 },
+                    { code: 'N111', name: 'Foundation APP', price: 3460 },
+                    { code: 'N211', name: 'Communications', price: 8830 },
+                    { code: 'N311', name: 'Core APP', price: 44740 },
                 ]
             },
             fellowship_principles: {
-                id: 'F1',
-                title: 'Part F1: Fellowship Principles (Select 2)',
-                subtitle: 'Note: F106 is required for CERA',
-                color: 'bg-red-700',
+                id: 'F1', title: 'Part F1: Fellowship Principles', subtitle: 'Note: F106 is required for CERA', color: 'bg-red-700',
                 subjects: [
-                { code: 'F101', name: 'Health & Care Principles', price: 8180 },
-                { code: 'F102', name: 'Life Insurance Principles', price: 8180 },
-                { code: 'F103', name: 'General Insurance Principles', price: 8180 },
-                { code: 'F104', name: 'Retirement Benefits Principles', price: 8180 },
-                { code: 'F105', name: 'Finance & Investment Principles', price: 8180 },
-                { code: 'F106', name: 'Enterprise Risk Management', price: 10100 },
-                { code: 'F107', name: 'Banking Principles', price: 8180 },
-                { code: 'F108', name: 'Health, Social & Employee Benefits', price: 8180 },
+                    { code: 'F101', name: 'Health & Care Principles', price: 8830 },
+                    { code: 'F102', name: 'Life Insurance Principles', price: 8830 },
+                    { code: 'F103', name: 'General Insurance Principles', price: 8830 },
+                    { code: 'F104', name: 'Retirement Benefits Principles', price: 8830 },
+                    { code: 'F105', name: 'Finance & Investment Principles', price: 8830 },
+                    { code: 'F106', name: 'Enterprise Risk Management', price: 10660 },
+                    { code: 'F107', name: 'Banking Principles', price: 8830 },
+                    { code: 'F108', name: 'Health, Social & Employee Benefits', price: 8830 },
                 ]
             },
             fellowship_applications: {
-                id: 'F2',
-                title: 'Part F2: Fellowship Applications (Select 1)',
-                color: 'bg-red-800',
+                id: 'F2', title: 'Part F2: Fellowship Applications', color: 'bg-red-800',
                 subjects: [
-                { code: 'F201', name: 'Health & Care Applications', price: 8660 },
-                { code: 'F202', name: 'Life Insurance Applications', price: 8660 },
-                { code: 'F203', name: 'General Insurance Applications', price: 8660 },
-                { code: 'F204', name: 'Retirement & Related Benefits', price: 8660 },
-                { code: 'F205', name: 'Investment Applications', price: 8660 },
-                { code: 'F207', name: 'Banking Applications', price: 8660 },
+                    { code: 'F201', name: 'Health & Care Applications', price: 9180 },
+                    { code: 'F202', name: 'Life Insurance Applications', price: 9180 },
+                    { code: 'F203', name: 'General Insurance Applications', price: 9180 },
+                    { code: 'F204', name: 'Retirement & Related Benefits', price: 9180 },
+                    { code: 'F205', name: 'Investment Applications', price: 9180 },
+                    { code: 'F207', name: 'Banking Applications', price: 9180 },
                 ]
             },
             normative_fellow: {
-                id: 'N4',
-                title: 'N4: Fellowship Professional Practice',
-                color: 'bg-red-600',
-                subjects: [
-                { code: 'N411', name: 'Fellowship APP', price: 15910 },
-                ]
+                id: 'N4', title: 'N4: Fellowship Professional Practice', color: 'bg-red-600',
+                subjects: [ { code: 'N411', name: 'Fellowship APP', price: 16780 } ]
             }
         };
 
         const TIERS = [
-            {
-                id: 'TASSA',
-                title: 'TASSA (Technical Member)',
-                description: 'Foundation & Intermediate Technical',
-                keys: ['foundation', 'intermediate'],
-                color: 'border-teal-500',
-                bg: 'bg-teal-50 dark:bg-teal-900/20'
-            },
-            {
-                id: 'AMASSA',
-                title: 'AMASSA (Associate Member)',
-                description: 'Core Principles & Normative Skills',
-                keys: ['risk', 'normative'],
-                color: 'border-indigo-500',
-                bg: 'bg-indigo-50 dark:bg-indigo-900/20'
-            },
-            {
-                id: 'FASSA',
-                title: 'FASSA & CERA (Fellow)',
-                description: 'Fellowship Principles & Applications',
-                keys: ['fellowship_principles', 'fellowship_applications', 'normative_fellow'],
-                color: 'border-red-500',
-                bg: 'bg-red-50 dark:bg-red-900/20'
-            }
+            { id: 'TASSA', title: 'TASSA (Technical Member)', description: 'Foundation & Intermediate Technical', keys: ['foundation', 'intermediate'], color: 'border-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/20' },
+            { id: 'AMASSA', title: 'AMASSA (Associate Member)', description: 'Core Principles & Normative Skills', keys: ['risk', 'normative'], color: 'border-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+            { id: 'FASSA', title: 'FASSA & CERA (Fellow)', description: 'Fellowship Principles & Applications', keys: ['fellowship_principles', 'fellowship_applications', 'normative_fellow'], color: 'border-red-500', bg: 'bg-red-50 dark:bg-red-900/20' }
         ];
+
+        const PAST_PAPERS = [
+            '2019 S1', '2019 S2', '2020 S1', '2020 S2', 
+            '2021 S1', '2021 S2', '2022 S1', '2022 S2', 
+            '2023 S1', '2023 S2', '2024 S1', '2024 S2', 
+            '2025 S1', '2025 S2'
+        ];
+
+        const INITIAL_GRIND_STATE = {
+            weeksCompleted: 0,
+            a213: {
+                pricing: false,
+                single: false,
+                multiple: false
+            },
+            a112: {
+                macro: false,
+                micro: false,
+                models: false
+            },
+            papersA213: [],
+            papersA112: []
+        };
 
         // --- App Components ---
 
-        const ProgressBar = ({ percentage, color = "bg-blue-600" }) => (
-            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2 border border-slate-300 dark:border-slate-600" role="progressbar" aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">
-                <div 
-                className={`h-2.5 rounded-full transition-all duration-500 ease-out ${color}`} 
-                style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
-                ></div>
+        const ProgressBar = ({ percentage, color = "bg-blue-600", height = "h-2.5" }) => (
+            <div className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden ${height}`} role="progressbar" aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">
+                <div className={`${height} rounded-full transition-all duration-500 ease-out ${color}`} style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}></div>
             </div>
         );
 
@@ -257,19 +234,15 @@
             const radius = 35;
             const circumference = 2 * Math.PI * radius;
             const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
             return (
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-md transition-all break-inside-avoid">
-                    <div className="relative w-24 h-24 mb-3" role="graphics-symbol" aria-label={`Progress chart for ${label}: ${Math.round(percentage)}%`}>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-md transition-all">
+                    <div className="relative w-24 h-24 mb-3" role="graphics-symbol" aria-label={`Progress: ${Math.round(percentage)}%`}>
                         <svg className="w-full h-full transform -rotate-90">
-                            <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100 dark:text-slate-700" />
+                            <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100 dark:text-slate-700" />
                             <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className={`${colorClass} transition-all duration-1000 ease-out`} strokeLinecap="round" />
                         </svg>
-                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg" aria-hidden="true">
-                            {Math.round(percentage)}%
-                        </div>
+                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg">{Math.round(percentage)}%</div>
                     </div>
-                    
                     <div className="flex items-center gap-2 mb-1">
                         <Icon size={18} className="text-slate-500 dark:text-slate-400" />
                         <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{label}</h3>
@@ -280,221 +253,423 @@
         };
 
         const SubjectCard = ({ subject, isCompleted, toggleSubject, color }) => {
-            const isNextGoal = subject.code === 'A213' && !isCompleted;
-
-            // Accessibility: Handle Enter/Space for keyboard users
-            const handleKeyDown = (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault(); // Prevent page scroll on Space
-                    toggleSubject(subject.code);
-                }
-            };
+            const isNextGoal = CURRENT_TARGETS.includes(subject.code) && !isCompleted;
 
             return (
                 <div 
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={isCompleted}
-                    aria-label={`${subject.name} (${subject.code}). Cost: ${CONFIG.CURRENCY} ${subject.price}. ${isCompleted ? 'Completed' : 'Not completed'}`}
+                    role="button" tabIndex={0}
                     onClick={() => toggleSubject(subject.code)}
-                    onKeyDown={handleKeyDown}
+                    onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSubject(subject.code); } }}
                     className={`
-                        cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between break-inside-avoid focus-visible-ring
+                        cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between
                         ${isCompleted 
-                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-100' 
+                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-70' 
                         : isNextGoal 
                             ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600 shadow-md ring-1 ring-amber-200 dark:ring-amber-700'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-sm'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-sm'
                         }
                     `}
                 >
                     {isNextGoal && (
                         <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
-                        <Icons.Target size={10} /> NEXT GOAL
+                            <Icons.Target size={10} /> CURRENT TARGET
                         </div>
                     )}
 
-                    <div className="flex items-start justify-between">
-                        <div>
-                        <div className="flex items-center gap-2">
-                            <span className={`text-xs font-bold px-2 py-1 rounded border border-transparent ${isCompleted ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : `${color} text-white`}`}>
-                            {subject.code}
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <span className={`text-xs font-bold px-2 py-1 rounded border border-transparent ${isCompleted ? 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : `${color} text-white`}`}>
+                                {subject.code}
                             </span>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                                {isCompleted && <Icons.Check size={12} className="text-white" />}
+                            </div>
                         </div>
-                        <h4 className={`mt-2 text-sm font-medium ${isCompleted ? 'text-slate-500 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
+                        <h4 className={`mt-3 text-sm font-medium ${isCompleted ? 'text-slate-500 line-through dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
                             {subject.name}
                         </h4>
-                        </div>
-                        
-                        <div className={`
-                        w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
-                        ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-blue-400'}
-                        `}>
-                        {isCompleted && <Icons.Check size={14} className="text-white" />}
-                        </div>
+                        {isNextGoal && subject.note && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium flex items-center gap-1">
+                                <Icons.Calendar size={12} /> {subject.note}
+                            </p>
+                        )}
                     </div>
                     
-                    <div className={`mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-xs flex justify-between items-center ${isCompleted ? 'text-slate-400 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
-                        <span>{CONFIG.YEAR} Fee</span>
+                    <div className={`mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 text-xs flex justify-between items-center ${isCompleted ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <span>Fee</span>
                         <span className="font-mono font-semibold">{CONFIG.CURRENCY} {subject.price.toLocaleString()}</span>
                     </div>
                 </div>
             );
         };
 
-        const Section = ({ data, completedSubjects, toggleSubject }) => {
-            const total = data.subjects.length;
-            const completedCount = data.subjects.filter(s => completedSubjects.includes(s.code)).length;
-            const progress = (completedCount / total) * 100;
-
+        const SettingsPanel = ({ isOpen, onClose, onReset, darkMode, setDarkMode }) => {
+            if (!isOpen) return null;
             return (
-                <div className="mb-8 break-inside-avoid">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                        <span className={`w-3 h-3 rounded-full ${data.color}`}></span>
-                        {data.title}
-                    </h2>
-                    {data.subtitle && <p className="text-sm text-slate-500 dark:text-slate-400 ml-5">{data.subtitle}</p>}
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold dark:text-white">Settings</h2>
+                            <button onClick={onClose} className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-full transition-colors">
+                                <Icons.Check size={16} className="transform rotate-45 text-slate-500 dark:text-slate-300" />
+                            </button>
+                        </div>
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Appearance</h3>
+                                <button onClick={() => setDarkMode(!darkMode)} className="w-full flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <span className="flex items-center gap-3 font-medium dark:text-slate-200">
+                                        {darkMode ? <Icons.Moon size={20} className="text-indigo-400"/> : <Icons.Sun size={20} className="text-amber-500"/>}
+                                        {darkMode ? 'Dark Mode' : 'Light Mode'}
+                                    </span>
+                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded dark:text-slate-400">TOGGLE</span>
+                                </button>
+                            </div>
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                <button onClick={onReset} className="w-full p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2 font-bold">
+                                    <Icons.RotateCcw size={18} /> Hard Reset App Data
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{completedCount}/{total}</span>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {data.subjects.map(subject => (
-                    <SubjectCard 
-                        key={subject.code}
-                        subject={subject}
-                        isCompleted={completedSubjects.includes(subject.code)}
-                        toggleSubject={toggleSubject}
-                        color={data.color}
-                    />
-                    ))}
-                </div>
-                <div>
-                    <ProgressBar percentage={progress} color={data.color.replace('bg-', 'bg-opacity-80 bg-')} />
-                </div>
                 </div>
             );
         };
 
-        const TierGroup = ({ tier, children, isExpanded, toggle }) => {
-             // Accessibility: Handle Enter/Space for keyboard users
-             const handleKeyDown = (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggle();
-                }
+        // --- View 1: Pipeline View ---
+        const PipelineView = ({ completedSubjects, toggleSubject, stats }) => {
+            const [expandedTiers, setExpandedTiers] = useState({ TASSA: true, AMASSA: false, FASSA: false });
+            const toggleTier = (id) => setExpandedTiers(prev => ({ ...prev, [id]: !prev[id] }));
+
+            // Calculate current target costs specifically
+            const targetCost = CURRENT_TARGETS.reduce((sum, code) => {
+                let price = 0;
+                Object.values(SYLLABUS).forEach(section => {
+                    const found = section.subjects.find(s => s.code === code);
+                    if (found) price = found.price;
+                });
+                return sum + (completedSubjects.includes(code) ? 0 : price);
+            }, 0);
+
+            return (
+                <div className="pb-24 lg:pb-8 animate-fade-in">
+                    <header className="bg-slate-900 text-white pt-8 pb-20 px-6 relative overflow-hidden">
+                        <div className="max-w-6xl mx-auto relative z-10 flex justify-between items-start">
+                            <div>
+                                <div className="bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full text-xs font-bold border border-teal-500/30 inline-flex items-center gap-2 mb-3">
+                                    <Icons.User size={12} /> ENOCK KAZE00002
+                                </div>
+                                <h1 className="text-3xl font-bold mb-1">The Pipeline</h1>
+                                <p className="text-slate-400 text-sm">Macro view: 4,000 Hours to Fellowship.</p>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2 animate-blob"></div>
+                    </header>
+
+                    <div className="max-w-6xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 space-y-6">
+                        {/* Top Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                            <CircularProgress percentage={stats.tassa} label="TASSA" icon={Icons.BookOpen} colorClass="text-teal-500" />
+                            <CircularProgress percentage={stats.amassa} label="AMASSA" icon={Icons.Award} colorClass="text-indigo-500" />
+                            <CircularProgress percentage={stats.fassa} label="FASSA" icon={Icons.GraduationCap} colorClass="text-red-500" />
+                            
+                            <div className="col-span-2 lg:col-span-2 bg-slate-900 text-white p-5 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative overflow-hidden">
+                                <div className="relative z-10 w-full">
+                                    <div className="flex items-center gap-2 text-teal-400 mb-2">
+                                        <Icons.Wallet size={16} /> <span className="text-xs font-bold tracking-wider uppercase">Financials</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase">Target Cost</p>
+                                            <p className="text-xl font-bold text-amber-400">{CONFIG.CURRENCY} {targetCost.toLocaleString()}</p>
+                                        </div>
+                                        <div className="border-l border-slate-700 pl-4">
+                                            <p className="text-[10px] text-slate-400 uppercase">Total Remaining</p>
+                                            <p className="text-xl font-bold">{CONFIG.CURRENCY} {stats.remainingCost.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-teal-500 rounded-full blur-3xl opacity-20"></div>
+                            </div>
+                        </div>
+
+                        {/* Tiers List */}
+                        <div className="space-y-4">
+                            {TIERS.map(tier => (
+                                <div key={tier.id} className={`rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all ${expandedTiers[tier.id] ? 'bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800' : tier.bg}`}>
+                                    <div role="button" onClick={() => toggleTier(tier.id)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded-full ${expandedTiers[tier.id] ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
+                                                {expandedTiers[tier.id] ? <Icons.ChevronDown size={18} className="text-slate-600 dark:text-slate-300"/> : <Icons.ChevronRight size={18} className="text-slate-600 dark:text-slate-300"/>}
+                                            </div>
+                                            <div>
+                                                <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">{tier.title}</h2>
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{tier.description}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {expandedTiers[tier.id] && (
+                                        <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 space-y-8">
+                                            {tier.keys.map(key => {
+                                                const data = SYLLABUS[key];
+                                                const total = data.subjects.length;
+                                                const compCount = data.subjects.filter(s => completedSubjects.includes(s.code)).length;
+                                                return (
+                                                    <div key={key}>
+                                                        <div className="flex justify-between items-end mb-4">
+                                                            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                                                <span className={`w-2 h-2 rounded-full ${data.color}`}></span> {data.title}
+                                                            </h3>
+                                                            <span className="text-xs font-bold text-slate-400">{compCount}/{total}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                                            {data.subjects.map(subject => (
+                                                                <SubjectCard key={subject.code} subject={subject} isCompleted={completedSubjects.includes(subject.code)} toggleSubject={toggleSubject} color={data.color} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- View 2: The Grind View (Semester Focus) ---
+        const GrindView = ({ grindState, setGrindState }) => {
+            const [viewMode, setViewMode] = useState('syllabus'); // 'syllabus' or 'papers'
+
+            const toggleSyllabus = (subject, item) => {
+                setGrindState(prev => ({
+                    ...prev,
+                    [subject]: { ...prev[subject], [item]: !prev[subject][item] }
+                }));
+            };
+
+            const togglePaper = (subject, paper) => {
+                const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                setGrindState(prev => {
+                    const list = prev[key] || [];
+                    if (list.includes(paper)) {
+                        return { ...prev, [key]: list.filter(p => p !== paper) };
+                    } else {
+                        return { ...prev, [key]: [...list, paper] };
+                    }
+                });
+            };
+
+            const adjustWeeks = (amount) => {
+                setGrindState(prev => ({
+                    ...prev,
+                    weeksCompleted: Math.max(0, Math.min(29, prev.weeksCompleted + amount))
+                }));
+            };
+
+            const calcSyllabusProgress = (subjectObj, weights) => {
+                let total = 0;
+                let done = 0;
+                Object.keys(weights).forEach(k => {
+                    total += weights[k];
+                    if (subjectObj[k]) done += weights[k];
+                });
+                return (done / total) * 100;
+            };
+
+            const calcPapersProgress = (subject) => {
+                const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                const list = grindState[key] || [];
+                return (list.length / PAST_PAPERS.length) * 100;
+            };
+
+            const progA213 = viewMode === 'syllabus' 
+                ? calcSyllabusProgress(grindState.a213, { pricing: 60, single: 20, multiple: 20 })
+                : calcPapersProgress('a213');
+                
+            const progA112 = viewMode === 'syllabus'
+                ? calcSyllabusProgress(grindState.a112, { macro: 55, micro: 40, models: 5 })
+                : calcPapersProgress('a112');
+
+            const progWeeks = (grindState.weeksCompleted / 29) * 100;
+
+            const CheckItem = ({ label, weight, isChecked, onClick }) => (
+                <div onClick={onClick} className="flex items-center justify-between p-3 sm:p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                            {isChecked && <Icons.Check size={14} className="text-white" />}
+                        </div>
+                        <span className={`text-sm font-medium ${isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>{label}</span>
+                    </div>
+                    {weight && <span className="text-xs font-bold text-slate-400">{weight}%</span>}
+                </div>
+            );
+
+            const PaperGrid = ({ subjectKey, activeClass }) => {
+                const list = grindState[subjectKey] || [];
+                return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                        {PAST_PAPERS.map(paper => {
+                            const isDone = list.includes(paper);
+                            return (
+                                <button
+                                    key={paper}
+                                    onClick={() => togglePaper(subjectKey === 'papersA213' ? 'a213' : 'a112', paper)}
+                                    className={`py-2 px-1 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5
+                                        ${isDone ? `${activeClass} text-white border-transparent shadow-sm` : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400`}`}
+                                >
+                                    {isDone && <Icons.Check size={12} />}
+                                    {paper}
+                                </button>
+                            );
+                        })}
+                    </div>
+                );
             };
 
             return (
-                <div className={`mb-6 rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-white dark:bg-slate-900 shadow-sm' : `${tier.bg}`}`}>
-                <div 
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    aria-label={`Toggle ${tier.title}`}
-                    onClick={toggle}
-                    onKeyDown={handleKeyDown}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors break-after-avoid focus-visible-ring outline-none"
-                >
-                    <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${isExpanded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
-                        {isExpanded ? <Icons.ChevronDown size={20} className="text-slate-600 dark:text-slate-300"/> : <Icons.ChevronRight size={20} className="text-slate-600 dark:text-slate-300"/>}
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{tier.title}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{tier.description}</p>
-                    </div>
-                    </div>
-                    <div className="text-xs font-bold px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider no-print">
-                    {isExpanded ? 'View Less' : 'View Subjects'}
-                    </div>
-                </div>
-                
-                {isExpanded && (
-                    <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800">
-                    {children}
-                    </div>
-                )}
-                </div>
-            );
-        };
+                <div className="pb-24 lg:pb-8 h-full min-h-screen bg-slate-50 dark:bg-slate-900 animate-fade-in">
+                    <header className="bg-indigo-900 text-white pt-8 pb-20 px-6 relative overflow-hidden">
+                        <div className="max-w-5xl mx-auto relative z-10">
+                            <h1 className="text-3xl font-bold mb-1">The Grind</h1>
+                            <p className="text-indigo-200 text-sm">Semester 2 Target: 20 hrs/week • Mar to Sep</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2"></div>
+                    </header>
 
-        const SettingsPanel = ({ isOpen, onClose, onReset, darkMode, setDarkMode }) => {
-            if (!isOpen) return null;
-
-            return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in no-print" onClick={onClose}>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold dark:text-white">Settings & Tools</h2>
-                            <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
-                                <Icons.Check size={20} className="transform rotate-45 text-slate-500" />
-                            </button>
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 space-y-6">
+                        {/* Weekly Timeline */}
+                        <div className="bg-white dark:bg-slate-800 p-5 sm:p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
+                            <div className="flex justify-between items-end mb-4">
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                        <Icons.Clock size={20} className="text-indigo-500" /> Study Timeline
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Goal: 600 Hours (20hrs/week)</p>
+                                </div>
+                                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <button onClick={() => adjustWeeks(-1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">-</button>
+                                    <span className="text-sm font-bold w-16 text-center dark:text-slate-200">Wk {grindState.weeksCompleted} <span className="text-slate-400 font-normal">/ 29</span></span>
+                                    <button onClick={() => adjustWeeks(1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">+</button>
+                                </div>
+                            </div>
+                            <ProgressBar percentage={progWeeks} color="bg-indigo-500" height="h-3" />
                         </div>
 
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Appearance</h3>
+                        {/* View Mode Toggle */}
+                        <div className="flex justify-center mb-2">
+                            <div className="bg-slate-200 dark:bg-slate-800 p-1 rounded-lg inline-flex shadow-inner">
                                 <button 
-                                    onClick={() => setDarkMode(!darkMode)}
-                                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                                    onClick={() => setViewMode('syllabus')}
+                                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'syllabus' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 >
-                                    <span className="flex items-center gap-2 dark:text-slate-200">
-                                        {darkMode ? <Icons.Moon size={18} /> : <Icons.Sun size={18} />}
-                                        {darkMode ? 'Dark Mode Active' : 'Light Mode Active'}
-                                    </span>
-                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded dark:text-slate-400">SWITCH</span>
+                                    Syllabus Topics
                                 </button>
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
                                 <button 
-                                    onClick={onReset}
-                                    className="w-full p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2 font-medium"
+                                    onClick={() => setViewMode('papers')}
+                                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'papers' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 >
-                                    <Icons.RotateCcw size={18} />
-                                    Reset All Progress
+                                    Past Papers
                                 </button>
                             </div>
                         </div>
 
-                        <div className="mt-6 text-center text-xs text-slate-400">
-                            Version {CONFIG.VERSION}
+                        {/* Side by side Syllabus Tracker */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* A213 */}
+                            <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="text-xs font-bold bg-teal-600 text-white px-2 py-0.5 rounded">A213</span>
+                                            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">Contingencies</h2>
+                                        </div>
+                                        <span className="text-lg font-bold text-teal-600 dark:text-teal-400">{Math.round(progA213)}%</span>
+                                    </div>
+                                    <ProgressBar percentage={progA213} color="bg-teal-500" />
+                                </div>
+                                
+                                {viewMode === 'syllabus' ? (
+                                    <div className="space-y-3 flex-grow">
+                                        <CheckItem label="Pricing & Reserving" weight={60} isChecked={grindState.a213.pricing} onClick={() => toggleSyllabus('a213', 'pricing')} />
+                                        <CheckItem label="Single Decrement Models" weight={20} isChecked={grindState.a213.single} onClick={() => toggleSyllabus('a213', 'single')} />
+                                        <CheckItem label="Multiple Decrement Models" weight={20} isChecked={grindState.a213.multiple} onClick={() => toggleSyllabus('a213', 'multiple')} />
+                                    </div>
+                                ) : (
+                                    <div className="flex-grow animate-fade-in">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">14 Papers (2019-2025)</p>
+                                        <PaperGrid subjectKey="papersA213" activeClass="bg-teal-500" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* A112 */}
+                            <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="text-xs font-bold bg-indigo-600 text-white px-2 py-0.5 rounded">A112</span>
+                                            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">Business Economics</h2>
+                                        </div>
+                                        <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{Math.round(progA112)}%</span>
+                                    </div>
+                                    <ProgressBar percentage={progA112} color="bg-indigo-500" />
+                                </div>
+                                
+                                {viewMode === 'syllabus' ? (
+                                    <div className="space-y-3 flex-grow">
+                                        <CheckItem label="Macroeconomics" weight={55} isChecked={grindState.a112.macro} onClick={() => toggleSyllabus('a112', 'macro')} />
+                                        <CheckItem label="Microeconomics" weight={40} isChecked={grindState.a112.micro} onClick={() => toggleSyllabus('a112', 'micro')} />
+                                        <CheckItem label="Models & History" weight={5} isChecked={grindState.a112.models} onClick={() => toggleSyllabus('a112', 'models')} />
+                                    </div>
+                                ) : (
+                                    <div className="flex-grow animate-fade-in">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">14 Papers (2019-2025)</p>
+                                        <PaperGrid subjectKey="papersA112" activeClass="bg-indigo-500" />
+                                    </div>
+                                )}
+                            </div>
+
                         </div>
                     </div>
                 </div>
             );
         };
 
+
+        // --- Main App Shell ---
         function App() {
-            const [completedSubjects, setCompletedSubjects] = useState(() => {
-                const saved = localStorage.getItem('assa-tracker-v1');
-                if (saved) return JSON.parse(saved);
-                return ['A211', 'N111']; 
-            });
-
-            const [darkMode, setDarkMode] = useState(false);
+            const [activeTab, setActiveTab] = useState('grind'); // 'pipeline' or 'grind'
+            const [darkMode, setDarkMode] = useState(true); // Default to dark for PWA feel
             const [showSettings, setShowSettings] = useState(false);
-            const [expandedTiers, setExpandedTiers] = useState({
-                TASSA: true,
-                AMASSA: false,
-                FASSA: false
+            
+            // State: Pipeline Checkmarks
+            const [completedSubjects, setCompletedSubjects] = useState(() => {
+                const saved = localStorage.getItem('assa-pipeline-v2');
+                return saved ? JSON.parse(saved) : ['A211']; 
             });
 
-            useEffect(() => {
-                localStorage.setItem('assa-tracker-v1', JSON.stringify(completedSubjects));
-            }, [completedSubjects]);
+            // State: The Grind Progress
+            const [grindState, setGrindState] = useState(() => {
+                const saved = localStorage.getItem('assa-grind-v1');
+                return saved ? JSON.parse(saved) : INITIAL_GRIND_STATE;
+            });
 
-            // Sync dark mode
+            // Sync Local Storage
+            useEffect(() => localStorage.setItem('assa-pipeline-v2', JSON.stringify(completedSubjects)), [completedSubjects]);
+            useEffect(() => localStorage.setItem('assa-grind-v1', JSON.stringify(grindState)), [grindState]);
+
+            // Sync Dark Mode
             useEffect(() => {
                 const root = document.documentElement;
                 if (darkMode) {
                     root.classList.add('dark');
                     document.body.classList.add('bg-slate-900', 'text-slate-100');
                     document.body.classList.remove('bg-slate-50', 'text-slate-900');
-                    // Update theme color meta tag
                     document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
                 } else {
                     root.classList.remove('dark');
@@ -504,43 +679,15 @@
                 }
             }, [darkMode]);
 
-            const toggleSubject = (code) => {
-                setCompletedSubjects(prev => 
-                prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
-                );
-            };
-
-            const toggleTier = (id) => {
-                setExpandedTiers(prev => ({ ...prev, [id]: !prev[id] }));
-            };
-
             const handleReset = () => {
-                if(window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
-                    setCompletedSubjects(['A211', 'N111']);
+                if(window.confirm("Delete all data? This cannot be undone.")) {
+                    setCompletedSubjects(['A211']);
+                    setGrindState(INITIAL_GRIND_STATE);
                     setShowSettings(false);
                 }
-            }
-
-            const handlePrint = (orientation) => {
-                const styleId = 'print-orientation-style';
-                let style = document.getElementById(styleId);
-                if (!style) {
-                    style = document.createElement('style');
-                    style.id = styleId;
-                    document.head.appendChild(style);
-                }
-                style.innerHTML = `@page { size: ${orientation}; margin: 5mm; }`;
-
-                setTimeout(() => {
-                    try {
-                        window.focus();
-                        window.print();
-                    } catch (e) {
-                        alert("Browser blocked print command. Please press Ctrl+P or Cmd+P to print.");
-                    }
-                }, 100);
             };
 
+            // Global Stats Calculation
             const stats = useMemo(() => {
                 const has = (code) => completedSubjects.includes(code);
                 const countCompleted = (list) => list.filter(s => has(s.code)).length;
@@ -553,171 +700,82 @@
                 
                 const tassaTotalItems = a1Total + a2Total + 1; 
                 const tassaDoneItems = a1Done + a2Done + n111Done;
-                const tassaProgress = (tassaDoneItems / tassaTotalItems) * 100;
 
                 const a3Done = countCompleted(SYLLABUS.risk.subjects);
                 const n2n3Done = (has('N211') ? 1 : 0) + (has('N311') ? 1 : 0);
                 const amassaTotalItems = tassaTotalItems + 1 + 2; 
                 const amassaDoneItems = tassaDoneItems + a3Done + n2n3Done;
-                const amassaProgress = (amassaDoneItems / amassaTotalItems) * 100;
 
                 const f1Count = countCompleted(SYLLABUS.fellowship_principles.subjects);
                 const f2Count = countCompleted(SYLLABUS.fellowship_applications.subjects);
                 const n4Done = has('N411') ? 1 : 0;
 
-                const effectiveF1 = Math.min(f1Count, 2);
-                const effectiveF2 = Math.min(f2Count, 1);
-
                 const fassaTotalItems = amassaTotalItems + 2 + 1 + 1; 
-                const fassaDoneItems = amassaDoneItems + effectiveF1 + effectiveF2 + n4Done;
-                const fassaProgress = (fassaDoneItems / fassaTotalItems) * 100;
-
-                const hasF106 = has('F106');
-                const ceraTotalItems = amassaTotalItems + 1; 
-                const ceraDoneItems = amassaDoneItems + (hasF106 ? 1 : 0);
-                const ceraProgress = (ceraDoneItems / ceraTotalItems) * 100;
+                const fassaDoneItems = amassaDoneItems + Math.min(f1Count, 2) + Math.min(f2Count, 1) + n4Done;
 
                 let remainingCost = 0;
-                const allSections = [
-                SYLLABUS.foundation, SYLLABUS.intermediate, SYLLABUS.risk, SYLLABUS.normative, 
-                SYLLABUS.fellowship_principles, SYLLABUS.fellowship_applications, SYLLABUS.normative_fellow
-                ];
-
-                allSections.forEach(section => {
-                section.subjects.forEach(subject => {
-                    if (!has(subject.code)) {
-                        if (section.id === 'F1' && f1Count >= 2) return; 
-                        if (section.id === 'F2' && f2Count >= 1) return;
-                        remainingCost += subject.price;
-                    }
-                });
+                [SYLLABUS.foundation, SYLLABUS.intermediate, SYLLABUS.risk, SYLLABUS.normative, SYLLABUS.fellowship_principles, SYLLABUS.fellowship_applications, SYLLABUS.normative_fellow].forEach(section => {
+                    section.subjects.forEach(subject => {
+                        if (!has(subject.code)) {
+                            if (section.id === 'F1' && f1Count >= 2) return; 
+                            if (section.id === 'F2' && f2Count >= 1) return;
+                            remainingCost += subject.price;
+                        }
+                    });
                 });
 
                 return {
-                    tassa: tassaProgress,
-                    amassa: amassaProgress,
-                    fassa: fassaProgress,
-                    cera: ceraProgress,
-                    f1Count,
-                    f2Count,
+                    tassa: (tassaDoneItems / tassaTotalItems) * 100,
+                    amassa: (amassaDoneItems / amassaTotalItems) * 100,
+                    fassa: (fassaDoneItems / fassaTotalItems) * 100,
                     remainingCost
                 };
             }, [completedSubjects]);
 
             return (
-                <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                
-                <SettingsPanel 
-                    isOpen={showSettings} 
-                    onClose={() => setShowSettings(false)}
-                    onReset={handleReset}
-                    darkMode={darkMode}
-                    setDarkMode={setDarkMode}
-                />
+                <div className="flex flex-col md:flex-row min-h-screen">
+                    
+                    <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} onReset={handleReset} darkMode={darkMode} setDarkMode={setDarkMode} />
 
-                <div className="fixed top-4 right-4 z-40 flex flex-col gap-2 no-print">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 flex flex-col gap-2">
-                    <button 
-                        onClick={() => setShowSettings(true)}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors focus-visible-ring"
-                        title="Open Settings"
-                        aria-label="Open Settings and Tools"
-                    >
-                        <Icons.Settings size={20} />
-                    </button>
-                    <hr className="border-slate-200 dark:border-slate-700" />
-                    <button 
-                        onClick={() => handlePrint('portrait')}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2 focus-visible-ring"
-                        title="Print Portrait"
-                        aria-label="Print in Portrait Mode"
-                    >
-                        <Icons.FileText size={20} />
-                    </button>
-                    <button 
-                        onClick={() => handlePrint('landscape')}
-                        className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2 focus-visible-ring"
-                        title="Print Landscape"
-                        aria-label="Print in Landscape Mode"
-                    >
-                        <Icons.ImageIcon size={20} className="transform rotate-90" />
-                    </button>
-                    </div>
-                </div>
+                    {/* Navigation: Bottom on Mobile, Left Sidebar on Desktop */}
+                    <nav className="fixed z-50 bottom-0 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 md:w-20 lg:w-64 md:h-screen md:border-t-0 md:border-r md:flex-col justify-between flex pb-safe">
+                        <div className="flex md:flex-col w-full h-16 md:h-auto md:pt-8 md:gap-4 px-2 md:px-4 items-center md:items-start justify-around">
+                            
+                            <div className="hidden lg:block w-full px-2 mb-8">
+                                <div className="font-bold text-xl dark:text-white flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded bg-gradient-to-br from-teal-400 to-indigo-600 flex items-center justify-center text-white text-xs">A</div>
+                                    ASSA Tracker
+                                </div>
+                            </div>
 
-                <header className="bg-slate-900 text-white pt-12 pb-24 px-6 relative overflow-hidden shrink-0 print:pt-4 print:pb-4 print:border-b-2 print:border-slate-900">
-                    <div className="max-w-6xl mx-auto relative z-10">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full text-xs font-bold border border-teal-500/30 flex items-center gap-2 print:border-slate-400 print:text-slate-800">
-                                <Icons.User size={12} />
-                                <span>ENOCK</span>
-                                <span className="w-1 h-1 bg-teal-500 rounded-full print:bg-slate-800"></span>
-                                <span>KAZE00002</span>
+                            <button onClick={() => setActiveTab('grind')} className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full transition-colors ${activeTab === 'grind' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                <Icons.Swords size={22} className={activeTab === 'grind' ? 'fill-indigo-100 dark:fill-indigo-900/50' : ''} />
+                                <span className="text-[10px] lg:text-sm font-bold">The Grind</span>
+                            </button>
+                            
+                            <button onClick={() => setActiveTab('pipeline')} className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full transition-colors ${activeTab === 'pipeline' ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                <Icons.LayoutDashboard size={22} className={activeTab === 'pipeline' ? 'fill-teal-100 dark:fill-teal-900/50' : ''} />
+                                <span className="text-[10px] lg:text-sm font-bold">Pipeline</span>
+                            </button>
+
+                            <div className="md:mt-auto md:mb-8 md:w-full">
+                                <button onClick={() => setShowSettings(true)} className="flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                    <Icons.Settings size={22} />
+                                    <span className="text-[10px] lg:text-sm font-bold">Settings</span>
+                                </button>
                             </div>
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-bold mb-2 print:text-2xl">{CONFIG.APP_NAME}</h1>
-                        <p className="text-slate-400 print:text-slate-600">Track your journey from Student to Fellow of the ASSA.</p>
-                        </div>
-                    </div>
-                    </div>
-                    
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2 animate-blob no-print"></div>
-                    <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2 animate-blob animation-delay-2000 no-print"></div>
-                </header>
+                    </nav>
 
-                <main className="max-w-6xl mx-auto px-6 -mt-16 relative z-20 flex-grow w-full print:mt-6 print:px-0">
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-12 print:grid-cols-5 print:gap-2 print:mb-8">
-                    <CircularProgress percentage={stats.tassa} label="TASSA" subLabel="Technically Advanced" icon={Icons.BookOpen} colorClass="text-teal-500" />
-                    <CircularProgress percentage={stats.amassa} label="AMASSA" subLabel="Associate" icon={Icons.Award} colorClass="text-indigo-500" />
-                    <CircularProgress percentage={stats.fassa} label="FASSA" subLabel="Fellow" icon={Icons.GraduationCap} colorClass="text-red-600" />
-                    <CircularProgress percentage={stats.cera} label="CERA" subLabel="Risk Actuary" icon={Icons.Shield} colorClass="text-emerald-600" />
-                    <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg border border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-xl transition-shadow relative overflow-hidden print:bg-white print:border-slate-300 print:text-black print:shadow-none print:p-2 break-inside-avoid">
-                        <div className="relative z-10">
-                        <Icons.Wallet size={24} className="text-teal-400 mb-2 mx-auto print:text-slate-800 no-print" />
-                        <p className="text-xs text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">Est. Remaining Cost</p>
-                        <h3 className="text-2xl font-bold text-white print:text-black print:text-lg">{CONFIG.CURRENCY} {stats.remainingCost.toLocaleString()}</h3>
-                        <p className="text-[10px] text-slate-500 mt-2 no-print">Based on {CONFIG.YEAR} Member Fees</p>
-                        </div>
-                        <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-teal-500 rounded-full blur-2xl opacity-20 no-print"></div>
-                    </div>
-                    </div>
+                    {/* Main Content Area */}
+                    <main className="flex-grow md:ml-20 lg:ml-64 w-full">
+                        {activeTab === 'pipeline' ? (
+                            <PipelineView completedSubjects={completedSubjects} toggleSubject={(c) => setCompletedSubjects(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])} stats={stats} />
+                        ) : (
+                            <GrindView grindState={grindState} setGrindState={setGrindState} />
+                        )}
+                    </main>
 
-                    <div className="space-y-4">
-                    {TIERS.map(tier => (
-                        <TierGroup key={tier.id} tier={tier} isExpanded={expandedTiers[tier.id]} toggle={() => toggleTier(tier.id)}>
-                        {tier.keys.map(key => {
-                            const isFellowshipLogic = tier.id === 'FASSA' && key === 'fellowship_principles';
-                            return (
-                                <Fragment key={key}>
-                                    {isFellowshipLogic && (
-                                    <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-lg flex items-center gap-3 break-inside-avoid">
-                                        <Icons.TrendingUp className="text-red-500 dark:text-red-400" />
-                                        <div>
-                                            <h3 className="font-bold text-red-900 dark:text-red-200">Fellowship Requirements</h3>
-                                            <p className="text-sm text-red-700 dark:text-red-300">
-                                            You have selected <span className="font-bold">{stats.f1Count}</span> Principles (Need 2) and <span className="font-bold">{stats.f2Count}</span> Applications (Need 1).
-                                            </p>
-                                        </div>
-                                    </div>
-                                    )}
-                                    <Section data={SYLLABUS[key]} completedSubjects={completedSubjects} toggleSubject={toggleSubject} />
-                                </Fragment>
-                            )
-                        })}
-                        </TierGroup>
-                    ))}
-                    </div>
-                </main>
-
-                <footer className="text-center text-slate-400 dark:text-slate-500 py-10 text-sm mt-auto bg-slate-900/5 dark:bg-black/20 print:py-4">
-                    <div className="max-w-6xl mx-auto px-6">
-                    <p className="font-semibold">{CONFIG.YEAR} © Kazembe CodeWorks. All rights reserved.</p>
-                    <p className="text-xs text-slate-300 dark:text-slate-600 mt-1 opacity-60 no-print">Fees are estimates based on {CONFIG.YEAR} Member rates and subject to change.</p>
-                    </div>
-                </footer>
                 </div>
             );
         }
