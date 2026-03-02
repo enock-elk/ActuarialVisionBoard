@@ -1,12 +1,12 @@
-const CACHE_NAME = 'assa-tracker-v2';
+const CACHE_NAME = 'assa-tracker-v3';
 
 // Add all the files you need to run the app offline here.
 const URLS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/assa-tracker-icon-192x192.png',
-  '/icons/assa-tracker-icon-512x512.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/assa-tracker-icon-192x192.png',
+  './icons/assa-tracker-icon-512x512.png'
 ];
 
 // 1. Install Event: Pre-cache the essential files

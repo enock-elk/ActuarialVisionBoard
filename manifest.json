@@ -2,7 +2,7 @@
   "name": "ASSA Qualification Tracker 2026",
   "short_name": "ASSA Tracker",
   "description": "Your 4,000-hour journey to Actuarial Fellowship. Track syllabus progress, fees, and study hours.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#0f172a",
