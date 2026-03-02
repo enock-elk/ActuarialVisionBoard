@@ -1,4 +1,4 @@
-const CACHE_NAME = 'assa-tracker-v1';
+const CACHE_NAME = 'assa-tracker-v2';
 
 // Add all the files you need to run the app offline here.
 const URLS_TO_CACHE = [

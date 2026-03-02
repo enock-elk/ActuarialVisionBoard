@@ -105,6 +105,15 @@
 
         const CURRENT_TARGETS = ['A112', 'A213'];
 
+        // Utility: Get current ISO week for Monday resets
+        const getISOWeek = () => {
+            const date = new Date();
+            date.setHours(0, 0, 0, 0);
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            const week1 = new Date(date.getFullYear(), 0, 4);
+            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+        };
+
         // --- Icons ---
         const Icon = ({ path, size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{path}</svg>
@@ -129,10 +138,13 @@
             Swords: (props) => <Icon {...props} path={<><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" y1="19" x2="19" y2="13" /><line x1="16" y1="16" x2="20" y2="20" /><line x1="19" y1="21" x2="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" y1="14" x2="9" y2="10" /><line x1="4" y1="17" x2="8" y2="21" /><line x1="3" y1="19" x2="5" y2="21" /></>} />,
             Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />,
             Calendar: (props) => <Icon {...props} path={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>} />,
-            Clock: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />
+            Clock: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
+            Play: (props) => <Icon {...props} path={<polygon points="5 3 19 12 5 21 5 3" />} />,
+            Square: (props) => <Icon {...props} path={<rect x="3" y="3" width="18" height="18" rx="2" ry="2" />} />,
+            Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
         };
 
-        // --- Data Structure (Updated for 2026 Fees) ---
+        // --- Data Structure ---
         const SYLLABUS = {
             foundation: {
                 id: 'A1', title: 'A1: Foundation Technical', color: 'bg-teal-600',
@@ -208,21 +220,34 @@
 
         const INITIAL_GRIND_STATE = {
             weeksCompleted: 0,
-            a213: {
-                pricing: false,
-                single: false,
-                multiple: false
-            },
-            a112: {
-                macro: false,
-                micro: false,
-                models: false
-            },
-            papersA213: [],
-            papersA112: []
+            studyTime: { week: getISOWeek(), seconds: 0, sessionStart: null },
+            notes: { a213: '', a112: '' },
+            a213: { pricing: false, single: false, multiple: false },
+            a112: { macro: false, micro: false, models: false },
+            papersA213: {},
+            papersA112: {}
         };
 
         // --- App Components ---
+
+        const CountdownTimer = ({ targetDate, label, colorBorder, colorBg }) => {
+            const [timeLeft, setTimeLeft] = useState(targetDate - Date.now());
+            useEffect(() => {
+                const timer = setInterval(() => setTimeLeft(targetDate - Date.now()), 1000);
+                return () => clearInterval(timer);
+            }, [targetDate]);
+
+            if (timeLeft <= 0) return null;
+            const d = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+            const h = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+            const m = Math.floor((timeLeft / 1000 / 60) % 60);
+            return (
+                <div className={`p-2 sm:p-3 rounded-lg border ${colorBorder} ${colorBg} flex flex-col items-center justify-center min-w-[90px] backdrop-blur-sm shadow-sm`}>
+                    <span className="text-[10px] font-bold uppercase mb-0.5 opacity-80">{label}</span>
+                    <div className="text-sm sm:text-lg font-mono font-bold leading-none">{d}d {h}h {m}m</div>
+                </div>
+            );
+        };
 
         const ProgressBar = ({ percentage, color = "bg-blue-600", height = "h-2.5" }) => (
             <div className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden ${height}`} role="progressbar" aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">
@@ -443,6 +468,35 @@
         // --- View 2: The Grind View (Semester Focus) ---
         const GrindView = ({ grindState, setGrindState }) => {
             const [viewMode, setViewMode] = useState('syllabus'); // 'syllabus' or 'papers'
+            const [liveTimer, setLiveTimer] = useState(0);
+            const [expandedNotes, setExpandedNotes] = useState({ a213: false, a112: false });
+
+            // Timer Engine
+            useEffect(() => {
+                let interval;
+                if (grindState.studyTime?.sessionStart) {
+                    interval = setInterval(() => {
+                        setLiveTimer(Math.floor((Date.now() - grindState.studyTime.sessionStart) / 1000));
+                    }, 1000);
+                } else {
+                    setLiveTimer(0);
+                }
+                return () => clearInterval(interval);
+            }, [grindState.studyTime?.sessionStart]);
+
+            const toggleTimer = () => {
+                setGrindState(prev => {
+                    const st = prev.studyTime;
+                    if (st.sessionStart) {
+                        // Stop & save elapsed time
+                        const elapsed = Math.floor((Date.now() - st.sessionStart) / 1000);
+                        return { ...prev, studyTime: { ...st, seconds: st.seconds + elapsed, sessionStart: null } };
+                    } else {
+                        // Start session
+                        return { ...prev, studyTime: { ...st, sessionStart: Date.now() } };
+                    }
+                });
+            };
 
             const toggleSyllabus = (subject, item) => {
                 setGrindState(prev => ({
@@ -451,28 +505,48 @@
                 }));
             };
 
-            const togglePaper = (subject, paper) => {
+            const togglePaperStatus = (subject, paper) => {
                 const key = subject === 'a213' ? 'papersA213' : 'papersA112';
                 setGrindState(prev => {
-                    const list = prev[key] || [];
-                    if (list.includes(paper)) {
-                        return { ...prev, [key]: list.filter(p => p !== paper) };
+                    const currentStatus = prev[key][paper]?.status;
+                    let nextStatus = null;
+                    
+                    if (!currentStatus) nextStatus = 'red';
+                    else if (currentStatus === 'red') nextStatus = 'yellow';
+                    else if (currentStatus === 'yellow') nextStatus = 'green';
+                    else nextStatus = null; // reset
+                    
+                    const newMap = { ...prev[key] };
+                    if (nextStatus) {
+                        newMap[paper] = { ...newMap[paper], status: nextStatus, mark: newMap[paper]?.mark || '' };
                     } else {
-                        return { ...prev, [key]: [...list, paper] };
+                        delete newMap[paper];
                     }
+                    return { ...prev, [key]: newMap };
                 });
             };
 
+            const setPaperMark = (subject, paper, mark) => {
+                 const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                 setGrindState(prev => ({
+                     ...prev,
+                     [key]: {
+                         ...prev[key],
+                         [paper]: { ...prev[key][paper], mark }
+                     }
+                 }));
+            };
+
+            const updateNotes = (subject, text) => {
+                setGrindState(prev => ({ ...prev, notes: { ...prev.notes, [subject]: text } }));
+            };
+
             const adjustWeeks = (amount) => {
-                setGrindState(prev => ({
-                    ...prev,
-                    weeksCompleted: Math.max(0, Math.min(29, prev.weeksCompleted + amount))
-                }));
+                setGrindState(prev => ({ ...prev, weeksCompleted: Math.max(0, Math.min(29, prev.weeksCompleted + amount)) }));
             };
 
             const calcSyllabusProgress = (subjectObj, weights) => {
-                let total = 0;
-                let done = 0;
+                let total = 0; let done = 0;
                 Object.keys(weights).forEach(k => {
                     total += weights[k];
                     if (subjectObj[k]) done += weights[k];
@@ -482,19 +556,38 @@
 
             const calcPapersProgress = (subject) => {
                 const key = subject === 'a213' ? 'papersA213' : 'papersA112';
-                const list = grindState[key] || [];
-                return (list.length / PAST_PAPERS.length) * 100;
+                const list = grindState[key] || {};
+                return (Object.keys(list).length / PAST_PAPERS.length) * 100;
             };
 
-            const progA213 = viewMode === 'syllabus' 
-                ? calcSyllabusProgress(grindState.a213, { pricing: 60, single: 20, multiple: 20 })
-                : calcPapersProgress('a213');
-                
-            const progA112 = viewMode === 'syllabus'
-                ? calcSyllabusProgress(grindState.a112, { macro: 55, micro: 40, models: 5 })
-                : calcPapersProgress('a112');
+            const getPaperStats = (subjectKey) => {
+                const papers = grindState[subjectKey] || {};
+                const keys = Object.keys(papers);
+                let totalMark = 0; let count = 0;
+                keys.forEach(k => {
+                    const m = parseInt(papers[k].mark);
+                    if (!isNaN(m)) { totalMark += m; count++; }
+                });
+                const avg = count > 0 ? (totalMark / count).toFixed(1) : '-';
+                return { avg, completed: keys.length };
+            };
 
-            const progWeeks = (grindState.weeksCompleted / 29) * 100;
+            const progA213 = viewMode === 'syllabus' ? calcSyllabusProgress(grindState.a213, { pricing: 60, single: 20, multiple: 20 }) : calcPapersProgress('a213');
+            const progA112 = viewMode === 'syllabus' ? calcSyllabusProgress(grindState.a112, { macro: 55, micro: 40, models: 5 }) : calcPapersProgress('a112');
+            
+            // Timer Stats
+            const totalSecondsThisWeek = (grindState.studyTime?.seconds || 0) + liveTimer;
+            const hoursThisWeek = (totalSecondsThisWeek / 3600).toFixed(2);
+            const weeklyProgress = Math.min(100, (totalSecondsThisWeek / (20 * 3600)) * 100);
+
+            const formatLiveTime = (totalSeconds) => {
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = totalSeconds % 60;
+                return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+            };
+            const activeTimerStr = formatLiveTime(liveTimer);
+
 
             const CheckItem = ({ label, weight, isChecked, onClick }) => (
                 <div onClick={onClick} className="flex items-center justify-between p-3 sm:p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition-colors">
@@ -508,24 +601,49 @@
                 </div>
             );
 
-            const PaperGrid = ({ subjectKey, activeClass }) => {
-                const list = grindState[subjectKey] || [];
+            const PaperGrid = ({ subjectKey }) => {
+                const list = grindState[subjectKey] || {};
+                const { avg, completed } = getPaperStats(subjectKey);
+                
                 return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                        {PAST_PAPERS.map(paper => {
-                            const isDone = list.includes(paper);
-                            return (
-                                <button
-                                    key={paper}
-                                    onClick={() => togglePaper(subjectKey === 'papersA213' ? 'a213' : 'a112', paper)}
-                                    className={`py-2 px-1 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5
-                                        ${isDone ? `${activeClass} text-white border-transparent shadow-sm` : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400`}`}
-                                >
-                                    {isDone && <Icons.Check size={12} />}
-                                    {paper}
-                                </button>
-                            );
-                        })}
+                    <div>
+                        <div className="flex justify-between mb-3 bg-slate-200/50 dark:bg-slate-700/30 p-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300">
+                            <span>AVG MARK: <span className="text-indigo-600 dark:text-indigo-400">{avg}{avg !== '-' && '%'}</span></span>
+                            <span>{completed}/{PAST_PAPERS.length} DONE</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {PAST_PAPERS.map(paper => {
+                                const data = list[paper];
+                                let bgClass = "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400";
+                                if (data?.status === 'red') bgClass = "bg-red-500 text-white border-transparent shadow-md";
+                                if (data?.status === 'yellow') bgClass = "bg-amber-500 text-white border-transparent shadow-md";
+                                if (data?.status === 'green') bgClass = "bg-emerald-500 text-white border-transparent shadow-md";
+                                
+                                return (
+                                    <div key={paper} className="flex flex-col gap-1">
+                                        <button
+                                            onClick={() => togglePaperStatus(subjectKey === 'papersA213' ? 'a213' : 'a112', paper)}
+                                            className={`py-2 px-1 rounded-lg border text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 ${bgClass}`}
+                                        >
+                                            {data?.status === 'green' && <Icons.Check size={12} />}
+                                            {data?.status === 'yellow' && <Icons.TrendingUp size={12} />}
+                                            {data?.status === 'red' && <span className="w-2 h-2 block rounded-full bg-red-800/50"></span>}
+                                            {paper}
+                                        </button>
+                                        {data && (
+                                            <input 
+                                                type="number" 
+                                                placeholder="Mark %" 
+                                                value={data.mark || ''}
+                                                onChange={(e) => setPaperMark(subjectKey === 'papersA213' ? 'a213' : 'a112', paper, e.target.value)}
+                                                className="w-full text-center text-[10px] p-1.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                                                min="0" max="100"
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             };
@@ -533,9 +651,15 @@
             return (
                 <div className="pb-24 lg:pb-8 h-full min-h-screen bg-slate-50 dark:bg-slate-900 animate-fade-in">
                     <header className="bg-indigo-900 text-white pt-8 pb-20 px-6 relative overflow-hidden">
-                        <div className="max-w-5xl mx-auto relative z-10">
-                            <h1 className="text-3xl font-bold mb-1">The Grind</h1>
-                            <p className="text-indigo-200 text-sm">Semester 2 Target: 20 hrs/week • Mar to Sep</p>
+                        <div className="max-w-5xl mx-auto relative z-10 flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold mb-1">The Grind</h1>
+                                <p className="text-indigo-200 text-sm">Semester 2 Target: 20 hrs/week • Mar to Sep</p>
+                            </div>
+                            <div className="flex gap-3 mt-2 md:mt-0">
+                                <CountdownTimer targetDate={new Date('2026-09-24T14:00:00').getTime()} label="A112 (Sep 24)" colorBorder="border-indigo-400" colorBg="bg-indigo-800/60 text-indigo-100" />
+                                <CountdownTimer targetDate={new Date('2026-10-07T09:00:00').getTime()} label="A213 (Oct 07)" colorBorder="border-teal-400" colorBg="bg-teal-800/60 text-teal-100" />
+                            </div>
                         </div>
                         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2"></div>
                     </header>
@@ -543,20 +667,41 @@
                     <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 space-y-6">
                         {/* Weekly Timeline */}
                         <div className="bg-white dark:bg-slate-800 p-5 sm:p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
-                            <div className="flex justify-between items-end mb-4">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
                                 <div>
                                     <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                        <Icons.Clock size={20} className="text-indigo-500" /> Study Timeline
+                                        <Icons.Clock size={20} className="text-indigo-500" /> 20-Hour Weekly Goal
                                     </h2>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Goal: 600 Hours (20hrs/week)</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Resets every Monday. Logged: {hoursThisWeek} / 20 hrs</p>
                                 </div>
-                                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                                    <button onClick={() => adjustWeeks(-1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">-</button>
-                                    <span className="text-sm font-bold w-16 text-center dark:text-slate-200">Wk {grindState.weeksCompleted} <span className="text-slate-400 font-normal">/ 29</span></span>
-                                    <button onClick={() => adjustWeeks(1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">+</button>
+                                <div className="flex items-center gap-4 w-full sm:w-auto">
+                                    <button 
+                                        onClick={toggleTimer}
+                                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all flex-grow justify-center sm:flex-grow-0
+                                        ${grindState.studyTime?.sessionStart ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400 animate-pulse' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/80'}`}
+                                    >
+                                        {grindState.studyTime?.sessionStart ? <Icons.Square size={16} /> : <Icons.Play size={16} />}
+                                        {grindState.studyTime?.sessionStart ? activeTimerStr : 'Start Session'}
+                                    </button>
+                                    {/* Manual Tracker for total weeks (Desktop) */}
+                                    <div className="hidden sm:flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <button onClick={() => adjustWeeks(-1)} className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">-</button>
+                                        <span className="text-xs font-bold w-12 text-center dark:text-slate-200">Wk {grindState.weeksCompleted}</span>
+                                        <button onClick={() => adjustWeeks(1)} className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">+</button>
+                                    </div>
                                 </div>
                             </div>
-                            <ProgressBar percentage={progWeeks} color="bg-indigo-500" height="h-3" />
+                            <ProgressBar percentage={weeklyProgress} color="bg-indigo-500" height="h-3" />
+                            
+                            {/* Manual Tracker for total weeks (Mobile) */}
+                            <div className="mt-4 sm:hidden flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-3">
+                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Macro Weeks Completed</span>
+                                 <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <button onClick={() => adjustWeeks(-1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">-</button>
+                                    <span className="text-sm font-bold w-8 text-center dark:text-slate-200">{grindState.weeksCompleted}</span>
+                                    <button onClick={() => adjustWeeks(1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">+</button>
+                                </div>
+                            </div>
                         </div>
 
                         {/* View Mode Toggle */}
@@ -601,10 +746,24 @@
                                     </div>
                                 ) : (
                                     <div className="flex-grow animate-fade-in">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">14 Papers (2019-2025)</p>
-                                        <PaperGrid subjectKey="papersA213" activeClass="bg-teal-500" />
+                                        <PaperGrid subjectKey="papersA213" />
                                     </div>
                                 )}
+
+                                {/* Notes Section */}
+                                <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                    <button onClick={() => setExpandedNotes(p => ({...p, a213: !p.a213}))} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors w-full">
+                                        <Icons.Edit size={14} /> Subject Notes {grindState.notes?.a213 ? '(Saved)' : ''}
+                                    </button>
+                                    {expandedNotes.a213 && (
+                                        <textarea 
+                                            value={grindState.notes?.a213 || ''}
+                                            onChange={e => updateNotes('a213', e.target.value)}
+                                            className="mt-3 w-full h-28 p-3 text-xs rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-teal-500 outline-none resize-none transition-all"
+                                            placeholder="Write formulas, edge cases, or chapter summaries..."
+                                        />
+                                    )}
+                                </div>
                             </div>
 
                             {/* A112 */}
@@ -628,10 +787,24 @@
                                     </div>
                                 ) : (
                                     <div className="flex-grow animate-fade-in">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">14 Papers (2019-2025)</p>
-                                        <PaperGrid subjectKey="papersA112" activeClass="bg-indigo-500" />
+                                        <PaperGrid subjectKey="papersA112" />
                                     </div>
                                 )}
+
+                                {/* Notes Section */}
+                                <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                    <button onClick={() => setExpandedNotes(p => ({...p, a112: !p.a112}))} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors w-full">
+                                        <Icons.Edit size={14} /> Subject Notes {grindState.notes?.a112 ? '(Saved)' : ''}
+                                    </button>
+                                    {expandedNotes.a112 && (
+                                        <textarea 
+                                            value={grindState.notes?.a112 || ''}
+                                            onChange={e => updateNotes('a112', e.target.value)}
+                                            className="mt-3 w-full h-28 p-3 text-xs rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-all"
+                                            placeholder="Write definitions, graphs to remember, formulas..."
+                                        />
+                                    )}
+                                </div>
                             </div>
 
                         </div>
@@ -653,10 +826,29 @@
                 return saved ? JSON.parse(saved) : ['A211']; 
             });
 
-            // State: The Grind Progress
+            // State: The Grind Progress + Migration Logic
             const [grindState, setGrindState] = useState(() => {
                 const saved = localStorage.getItem('assa-grind-v1');
-                return saved ? JSON.parse(saved) : INITIAL_GRIND_STATE;
+                let parsed = saved ? JSON.parse(saved) : { ...INITIAL_GRIND_STATE };
+
+                // MIGRATION: Array to Object Heatmap structure for Past Papers
+                if (Array.isArray(parsed.papersA213)) {
+                    let obj = {}; parsed.papersA213.forEach(p => obj[p] = { status: 'green', mark: '' }); parsed.papersA213 = obj;
+                }
+                if (Array.isArray(parsed.papersA112)) {
+                    let obj = {}; parsed.papersA112.forEach(p => obj[p] = { status: 'green', mark: '' }); parsed.papersA112 = obj;
+                }
+                
+                // Ensure Notes exist
+                if (!parsed.notes) parsed.notes = { a213: '', a112: '' };
+
+                // Ensure Study Timer structure exists and handles Monday reset
+                const currentWeek = getISOWeek();
+                if (!parsed.studyTime || parsed.studyTime.week !== currentWeek) {
+                    parsed.studyTime = { week: currentWeek, seconds: 0, sessionStart: null };
+                }
+
+                return parsed;
             });
 
             // Sync Local Storage
@@ -682,7 +874,7 @@
             const handleReset = () => {
                 if(window.confirm("Delete all data? This cannot be undone.")) {
                     setCompletedSubjects(['A211']);
-                    setGrindState(INITIAL_GRIND_STATE);
+                    setGrindState({ ...INITIAL_GRIND_STATE, studyTime: { week: getISOWeek(), seconds: 0, sessionStart: null } });
                     setShowSettings(false);
                 }
             };
