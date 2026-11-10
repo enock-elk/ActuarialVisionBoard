@@ -1,9 +1,9 @@
-const CACHE_NAME = 'assa-tracker-v3';
+const CACHE_NAME = 'enock-home-v1';
 
-// Add all the files you need to run the app offline here.
 const URLS_TO_CACHE = [
   './',
   './index.html',
+  './actuarial.html',
   './manifest.json',
   './icons/assa-tracker-icon-192x192.png',
   './icons/assa-tracker-icon-512x512.png'
@@ -39,19 +39,16 @@ self.addEventListener('activate', (event) => {
 
 // 3. Fetch Event: Intercept network requests and serve from cache if available
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // Return the cached response if found
-        if (cachedResponse) {
-          return cachedResponse;
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
-        
-        // Otherwise, fetch from the network
-        return fetch(event.request).catch(() => {
-            // Optional: You could return a specific offline HTML page here if needed
-            console.log('[Service Worker] Network request failed and no cache available.');
-        });
+        return response;
       })
+      .catch(() => caches.match(event.request).then((cached) => cached || new Response('Offline', { status: 503 })))
   );
 });

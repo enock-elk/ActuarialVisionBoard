@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Track your journey from Student to Fellow of the ASSA.">
+    <meta name="theme-color" content="#0f172a">
+    <title>ASSA Qualification Roadmap</title>
+
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/assa-tracker-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/assa-tracker-icon-512x512.png">
+    <link rel="apple-touch-icon" href="icons/assa-tracker-icon-192x192.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind Config for Dark Mode & Animations -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        blob: "blob 7s infinite",
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            "0%": { transform: "translate(0px, 0px) scale(1)" },
+                            "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                            "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                            "100%": { transform: "translate(0px, 0px) scale(1)" },
+                        },
+                        slideUp: {
+                            "0%": { transform: "translateY(20px)", opacity: "0" },
+                            "100%": { transform: "translateY(0)", opacity: "1" },
+                        },
+                        fadeIn: {
+                            "0%": { opacity: "0" },
+                            "100%": { opacity: "1" },
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        /* Print Configuration */
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print { display: none !important; }
+            .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+            .break-after-avoid { break-after: avoid; page-break-after: avoid; }
+            html.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
+        }
+
+        /* Prevent overscroll bounce on mobile */
+        body { overscroll-behavior-y: none; }
+        
+        /* Custom Scrollbar for Desktop */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
+
+    <!-- Register Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.error('Service Worker registration failed', err));
+            });
+        }
+    </script>
+</head>
+<body class="bg-slate-50 transition-colors duration-300 antialiased selection:bg-teal-500 selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, Fragment } = React;
+
+        // --- CONSTANTS ---
+        const CONFIG = {
+            CURRENCY: 'R',
+            YEAR: 2026,
+            APP_NAME: 'ASSA Tracker',
+            VERSION: '3.0.0-PWA'
+        };
+
+        const CURRENT_TARGETS = ['A112', 'A213'];
+
+        // Utility: Get current ISO week for Monday resets
+        const getISOWeek = () => {
+            const date = new Date();
+            date.setHours(0, 0, 0, 0);
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            const week1 = new Date(date.getFullYear(), 0, 4);
+            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+        };
+
+        // --- Icons ---
+        const Icon = ({ path, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{path}</svg>
+        );
+
+        const Icons = {
+            Check: (props) => <Icon {...props} path={<polyline points="20 6 9 17 4 12" />} />,
+            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></>} />,
+            BookOpen: (props) => <Icon {...props} path={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></>} />,
+            TrendingUp: (props) => <Icon {...props} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>} />,
+            Shield: (props) => <Icon {...props} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />} />,
+            GraduationCap: (props) => <Icon {...props} path={<><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></>} />,
+            RotateCcw: (props) => <Icon {...props} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>} />,
+            Wallet: (props) => <Icon {...props} path={<><path d="M20 7h-3a2 2 0 0 1-2-2V3" /><path d="M9 9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" /></>} />,
+            User: (props) => <Icon {...props} path={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>} />,
+            Target: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>} />,
+            ChevronDown: (props) => <Icon {...props} path={<polyline points="6 9 12 15 18 9" />} />,
+            ChevronRight: (props) => <Icon {...props} path={<polyline points="9 18 15 12 9 6" />} />,
+            Moon: (props) => <Icon {...props} path={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />} />,
+            Sun: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>} />,
+            LayoutDashboard: (props) => <Icon {...props} path={<><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>} />,
+            Swords: (props) => <Icon {...props} path={<><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" y1="19" x2="19" y2="13" /><line x1="16" y1="16" x2="20" y2="20" /><line x1="19" y1="21" x2="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" y1="14" x2="9" y2="10" /><line x1="4" y1="17" x2="8" y2="21" /><line x1="3" y1="19" x2="5" y2="21" /></>} />,
+            Settings: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />,
+            Calendar: (props) => <Icon {...props} path={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>} />,
+            Clock: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
+            Play: (props) => <Icon {...props} path={<polygon points="5 3 19 12 5 21 5 3" />} />,
+            Square: (props) => <Icon {...props} path={<rect x="3" y="3" width="18" height="18" rx="2" ry="2" />} />,
+            Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
+        };
+
+        // --- Data Structure ---
+        const SYLLABUS = {
+            foundation: {
+                id: 'A1', title: 'A1: Foundation Technical', color: 'bg-teal-600',
+                subjects: [
+                    { code: 'A111', name: 'Actuarial Statistics', price: 9520 },
+                    { code: 'A112', name: 'Business Economics', price: 7800, note: "24 Sept | 2-hr Objective" },
+                    { code: 'A113', name: 'Business Finance', price: 7800 },
+                ]
+            },
+            intermediate: {
+                id: 'A2', title: 'A2: Intermediate Technical', color: 'bg-teal-700',
+                subjects: [
+                    { code: 'A211', name: 'Financial Mathematics', price: 3650 },
+                    { code: 'A212', name: 'Risk Modelling & Survival Analysis', price: 9520 },
+                    { code: 'A213', name: 'Contingencies', price: 5490, note: "7 Oct | Written + Computer" },
+                    { code: 'A214', name: 'Actuarial Economic Modelling', price: 9520 },
+                ]
+            },
+            risk: {
+                id: 'A3', title: 'A3: Actuarial Risk Management', color: 'bg-slate-700',
+                subjects: [ { code: 'A311', name: 'Actuarial Risk Management', price: 16420 } ]
+            },
+            normative: {
+                id: 'N1-N3', title: 'Normative Skills (Professional Practice)', color: 'bg-slate-600',
+                subjects: [
+                    { code: 'N111', name: 'Foundation APP', price: 3460 },
+                    { code: 'N211', name: 'Communications', price: 8830 },
+                    { code: 'N311', name: 'Core APP', price: 44740 },
+                ]
+            },
+            fellowship_principles: {
+                id: 'F1', title: 'Part F1: Fellowship Principles', subtitle: 'Note: F106 is required for CERA', color: 'bg-red-700',
+                subjects: [
+                    { code: 'F101', name: 'Health & Care Principles', price: 8830 },
+                    { code: 'F102', name: 'Life Insurance Principles', price: 8830 },
+                    { code: 'F103', name: 'General Insurance Principles', price: 8830 },
+                    { code: 'F104', name: 'Retirement Benefits Principles', price: 8830 },
+                    { code: 'F105', name: 'Finance & Investment Principles', price: 8830 },
+                    { code: 'F106', name: 'Enterprise Risk Management', price: 10660 },
+                    { code: 'F107', name: 'Banking Principles', price: 8830 },
+                    { code: 'F108', name: 'Health, Social & Employee Benefits', price: 8830 },
+                ]
+            },
+            fellowship_applications: {
+                id: 'F2', title: 'Part F2: Fellowship Applications', color: 'bg-red-800',
+                subjects: [
+                    { code: 'F201', name: 'Health & Care Applications', price: 9180 },
+                    { code: 'F202', name: 'Life Insurance Applications', price: 9180 },
+                    { code: 'F203', name: 'General Insurance Applications', price: 9180 },
+                    { code: 'F204', name: 'Retirement & Related Benefits', price: 9180 },
+                    { code: 'F205', name: 'Investment Applications', price: 9180 },
+                    { code: 'F207', name: 'Banking Applications', price: 9180 },
+                ]
+            },
+            normative_fellow: {
+                id: 'N4', title: 'N4: Fellowship Professional Practice', color: 'bg-red-600',
+                subjects: [ { code: 'N411', name: 'Fellowship APP', price: 16780 } ]
+            }
+        };
+
+        const TIERS = [
+            { id: 'TASSA', title: 'TASSA (Technical Member)', description: 'Foundation & Intermediate Technical', keys: ['foundation', 'intermediate'], color: 'border-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/20' },
+            { id: 'AMASSA', title: 'AMASSA (Associate Member)', description: 'Core Principles & Normative Skills', keys: ['risk', 'normative'], color: 'border-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+            { id: 'FASSA', title: 'FASSA & CERA (Fellow)', description: 'Fellowship Principles & Applications', keys: ['fellowship_principles', 'fellowship_applications', 'normative_fellow'], color: 'border-red-500', bg: 'bg-red-50 dark:bg-red-900/20' }
+        ];
+
+        const PAST_PAPERS = [
+            '2019 S1', '2019 S2', '2020 S1', '2020 S2', 
+            '2021 S1', '2021 S2', '2022 S1', '2022 S2', 
+            '2023 S1', '2023 S2', '2024 S1', '2024 S2', 
+            '2025 S1', '2025 S2'
+        ];
+
+        const INITIAL_GRIND_STATE = {
+            weeksCompleted: 0,
+            studyTime: { week: getISOWeek(), seconds: 0, sessionStart: null },
+            notes: { a213: '', a112: '' },
+            a213: { pricing: false, single: false, multiple: false },
+            a112: { macro: false, micro: false, models: false },
+            papersA213: {},
+            papersA112: {}
+        };
+
+        // --- App Components ---
+
+        const CountdownTimer = ({ targetDate, label, colorBorder, colorBg }) => {
+            const [timeLeft, setTimeLeft] = useState(targetDate - Date.now());
+            useEffect(() => {
+                const timer = setInterval(() => setTimeLeft(targetDate - Date.now()), 1000);
+                return () => clearInterval(timer);
+            }, [targetDate]);
+
+            if (timeLeft <= 0) return null;
+            const d = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+            const h = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+            const m = Math.floor((timeLeft / 1000 / 60) % 60);
+            return (
+                <div className={`p-2 sm:p-3 rounded-lg border ${colorBorder} ${colorBg} flex flex-col items-center justify-center min-w-[90px] backdrop-blur-sm shadow-sm`}>
+                    <span className="text-[10px] font-bold uppercase mb-0.5 opacity-80">{label}</span>
+                    <div className="text-sm sm:text-lg font-mono font-bold leading-none">{d}d {h}h {m}m</div>
+                </div>
+            );
+        };
+
+        const ProgressBar = ({ percentage, color = "bg-blue-600", height = "h-2.5" }) => (
+            <div className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden ${height}`} role="progressbar" aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">
+                <div className={`${height} rounded-full transition-all duration-500 ease-out ${color}`} style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}></div>
+            </div>
+        );
+
+        const CircularProgress = ({ percentage, label, icon: Icon, subLabel, colorClass }) => {
+            const radius = 35;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (percentage / 100) * circumference;
+            return (
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center hover:shadow-md transition-all">
+                    <div className="relative w-24 h-24 mb-3" role="graphics-symbol" aria-label={`Progress: ${Math.round(percentage)}%`}>
+                        <svg className="w-full h-full transform -rotate-90">
+                            <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100 dark:text-slate-700" />
+                            <circle cx="48" cy="48" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className={`${colorClass} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+                        </svg>
+                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-lg">{Math.round(percentage)}%</div>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Icon size={18} className="text-slate-500 dark:text-slate-400" />
+                        <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{label}</h3>
+                    </div>
+                    {subLabel && <p className="text-xs text-slate-500 dark:text-slate-400">{subLabel}</p>}
+                </div>
+            );
+        };
+
+        const SubjectCard = ({ subject, isCompleted, toggleSubject, color }) => {
+            const isNextGoal = CURRENT_TARGETS.includes(subject.code) && !isCompleted;
+
+            return (
+                <div 
+                    role="button" tabIndex={0}
+                    onClick={() => toggleSubject(subject.code)}
+                    onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSubject(subject.code); } }}
+                    className={`
+                        cursor-pointer group relative overflow-hidden rounded-lg p-4 border transition-all duration-200 flex flex-col justify-between
+                        ${isCompleted 
+                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-70' 
+                        : isNextGoal 
+                            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600 shadow-md ring-1 ring-amber-200 dark:ring-amber-700'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-sm'
+                        }
+                    `}
+                >
+                    {isNextGoal && (
+                        <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                            <Icons.Target size={10} /> CURRENT TARGET
+                        </div>
+                    )}
+
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <span className={`text-xs font-bold px-2 py-1 rounded border border-transparent ${isCompleted ? 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : `${color} text-white`}`}>
+                                {subject.code}
+                            </span>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                                {isCompleted && <Icons.Check size={12} className="text-white" />}
+                            </div>
+                        </div>
+                        <h4 className={`mt-3 text-sm font-medium ${isCompleted ? 'text-slate-500 line-through dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+                            {subject.name}
+                        </h4>
+                        {isNextGoal && subject.note && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium flex items-center gap-1">
+                                <Icons.Calendar size={12} /> {subject.note}
+                            </p>
+                        )}
+                    </div>
+                    
+                    <div className={`mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 text-xs flex justify-between items-center ${isCompleted ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <span>Fee</span>
+                        <span className="font-mono font-semibold">{CONFIG.CURRENCY} {subject.price.toLocaleString()}</span>
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsPanel = ({ isOpen, onClose, onReset, darkMode, setDarkMode }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold dark:text-white">Settings</h2>
+                            <button onClick={onClose} className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-full transition-colors">
+                                <Icons.Check size={16} className="transform rotate-45 text-slate-500 dark:text-slate-300" />
+                            </button>
+                        </div>
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Appearance</h3>
+                                <button onClick={() => setDarkMode(!darkMode)} className="w-full flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <span className="flex items-center gap-3 font-medium dark:text-slate-200">
+                                        {darkMode ? <Icons.Moon size={20} className="text-indigo-400"/> : <Icons.Sun size={20} className="text-amber-500"/>}
+                                        {darkMode ? 'Dark Mode' : 'Light Mode'}
+                                    </span>
+                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded dark:text-slate-400">TOGGLE</span>
+                                </button>
+                            </div>
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                <button onClick={onReset} className="w-full p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2 font-bold">
+                                    <Icons.RotateCcw size={18} /> Hard Reset App Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- View 1: Pipeline View ---
+        const PipelineView = ({ completedSubjects, toggleSubject, stats }) => {
+            const [expandedTiers, setExpandedTiers] = useState({ TASSA: true, AMASSA: false, FASSA: false });
+            const toggleTier = (id) => setExpandedTiers(prev => ({ ...prev, [id]: !prev[id] }));
+
+            // Calculate current target costs specifically
+            const targetCost = CURRENT_TARGETS.reduce((sum, code) => {
+                let price = 0;
+                Object.values(SYLLABUS).forEach(section => {
+                    const found = section.subjects.find(s => s.code === code);
+                    if (found) price = found.price;
+                });
+                return sum + (completedSubjects.includes(code) ? 0 : price);
+            }, 0);
+
+            return (
+                <div className="pb-24 lg:pb-8 animate-fade-in">
+                    <header className="bg-slate-900 text-white pt-8 pb-20 px-6 relative overflow-hidden">
+                        <div className="max-w-6xl mx-auto relative z-10 flex justify-between items-start">
+                            <div>
+                                <div className="bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full text-xs font-bold border border-teal-500/30 inline-flex items-center gap-2 mb-3">
+                                    <Icons.User size={12} /> ENOCK KAZE00002
+                                </div>
+                                <h1 className="text-3xl font-bold mb-1">The Pipeline</h1>
+                                <p className="text-slate-400 text-sm">Macro view: 4,000 Hours to Fellowship.</p>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2 animate-blob"></div>
+                    </header>
+
+                    <div className="max-w-6xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 space-y-6">
+                        {/* Top Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                            <CircularProgress percentage={stats.tassa} label="TASSA" icon={Icons.BookOpen} colorClass="text-teal-500" />
+                            <CircularProgress percentage={stats.amassa} label="AMASSA" icon={Icons.Award} colorClass="text-indigo-500" />
+                            <CircularProgress percentage={stats.fassa} label="FASSA" icon={Icons.GraduationCap} colorClass="text-red-500" />
+                            
+                            <div className="col-span-2 lg:col-span-2 bg-slate-900 text-white p-5 rounded-xl shadow-lg border border-slate-700 flex items-center justify-between relative overflow-hidden">
+                                <div className="relative z-10 w-full">
+                                    <div className="flex items-center gap-2 text-teal-400 mb-2">
+                                        <Icons.Wallet size={16} /> <span className="text-xs font-bold tracking-wider uppercase">Financials</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase">Target Cost</p>
+                                            <p className="text-xl font-bold text-amber-400">{CONFIG.CURRENCY} {targetCost.toLocaleString()}</p>
+                                        </div>
+                                        <div className="border-l border-slate-700 pl-4">
+                                            <p className="text-[10px] text-slate-400 uppercase">Total Remaining</p>
+                                            <p className="text-xl font-bold">{CONFIG.CURRENCY} {stats.remainingCost.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-teal-500 rounded-full blur-3xl opacity-20"></div>
+                            </div>
+                        </div>
+
+                        {/* Tiers List */}
+                        <div className="space-y-4">
+                            {TIERS.map(tier => (
+                                <div key={tier.id} className={`rounded-xl border-l-4 ${tier.color} overflow-hidden transition-all ${expandedTiers[tier.id] ? 'bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800' : tier.bg}`}>
+                                    <div role="button" onClick={() => toggleTier(tier.id)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded-full ${expandedTiers[tier.id] ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/50 dark:bg-slate-700/50'}`}>
+                                                {expandedTiers[tier.id] ? <Icons.ChevronDown size={18} className="text-slate-600 dark:text-slate-300"/> : <Icons.ChevronRight size={18} className="text-slate-600 dark:text-slate-300"/>}
+                                            </div>
+                                            <div>
+                                                <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">{tier.title}</h2>
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{tier.description}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {expandedTiers[tier.id] && (
+                                        <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 space-y-8">
+                                            {tier.keys.map(key => {
+                                                const data = SYLLABUS[key];
+                                                const total = data.subjects.length;
+                                                const compCount = data.subjects.filter(s => completedSubjects.includes(s.code)).length;
+                                                return (
+                                                    <div key={key}>
+                                                        <div className="flex justify-between items-end mb-4">
+                                                            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                                                <span className={`w-2 h-2 rounded-full ${data.color}`}></span> {data.title}
+                                                            </h3>
+                                                            <span className="text-xs font-bold text-slate-400">{compCount}/{total}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                                            {data.subjects.map(subject => (
+                                                                <SubjectCard key={subject.code} subject={subject} isCompleted={completedSubjects.includes(subject.code)} toggleSubject={toggleSubject} color={data.color} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- View 2: The Grind View (Semester Focus) ---
+        const GrindView = ({ grindState, setGrindState }) => {
+            const [viewMode, setViewMode] = useState('syllabus'); // 'syllabus' or 'papers'
+            const [liveTimer, setLiveTimer] = useState(0);
+            const [expandedNotes, setExpandedNotes] = useState({ a213: false, a112: false });
+
+            // Timer Engine
+            useEffect(() => {
+                let interval;
+                if (grindState.studyTime?.sessionStart) {
+                    interval = setInterval(() => {
+                        setLiveTimer(Math.floor((Date.now() - grindState.studyTime.sessionStart) / 1000));
+                    }, 1000);
+                } else {
+                    setLiveTimer(0);
+                }
+                return () => clearInterval(interval);
+            }, [grindState.studyTime?.sessionStart]);
+
+            const toggleTimer = () => {
+                setGrindState(prev => {
+                    const st = prev.studyTime;
+                    if (st.sessionStart) {
+                        // Stop & save elapsed time
+                        const elapsed = Math.floor((Date.now() - st.sessionStart) / 1000);
+                        return { ...prev, studyTime: { ...st, seconds: st.seconds + elapsed, sessionStart: null } };
+                    } else {
+                        // Start session
+                        return { ...prev, studyTime: { ...st, sessionStart: Date.now() } };
+                    }
+                });
+            };
+
+            const toggleSyllabus = (subject, item) => {
+                setGrindState(prev => ({
+                    ...prev,
+                    [subject]: { ...prev[subject], [item]: !prev[subject][item] }
+                }));
+            };
+
+            const togglePaperStatus = (subject, paper) => {
+                const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                setGrindState(prev => {
+                    const currentStatus = prev[key][paper]?.status;
+                    let nextStatus = null;
+                    
+                    if (!currentStatus) nextStatus = 'red';
+                    else if (currentStatus === 'red') nextStatus = 'yellow';
+                    else if (currentStatus === 'yellow') nextStatus = 'green';
+                    else nextStatus = null; // reset
+                    
+                    const newMap = { ...prev[key] };
+                    if (nextStatus) {
+                        newMap[paper] = { ...newMap[paper], status: nextStatus, mark: newMap[paper]?.mark || '' };
+                    } else {
+                        delete newMap[paper];
+                    }
+                    return { ...prev, [key]: newMap };
+                });
+            };
+
+            const setPaperMark = (subject, paper, mark) => {
+                 const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                 setGrindState(prev => ({
+                     ...prev,
+                     [key]: {
+                         ...prev[key],
+                         [paper]: { ...prev[key][paper], mark }
+                     }
+                 }));
+            };
+
+            const updateNotes = (subject, text) => {
+                setGrindState(prev => ({ ...prev, notes: { ...prev.notes, [subject]: text } }));
+            };
+
+            const adjustWeeks = (amount) => {
+                setGrindState(prev => ({ ...prev, weeksCompleted: Math.max(0, Math.min(29, prev.weeksCompleted + amount)) }));
+            };
+
+            const calcSyllabusProgress = (subjectObj, weights) => {
+                let total = 0; let done = 0;
+                Object.keys(weights).forEach(k => {
+                    total += weights[k];
+                    if (subjectObj[k]) done += weights[k];
+                });
+                return (done / total) * 100;
+            };
+
+            const calcPapersProgress = (subject) => {
+                const key = subject === 'a213' ? 'papersA213' : 'papersA112';
+                const list = grindState[key] || {};
+                return (Object.keys(list).length / PAST_PAPERS.length) * 100;
+            };
+
+            const getPaperStats = (subjectKey) => {
+                const papers = grindState[subjectKey] || {};
+                const keys = Object.keys(papers);
+                let totalMark = 0; let count = 0;
+                keys.forEach(k => {
+                    const m = parseInt(papers[k].mark);
+                    if (!isNaN(m)) { totalMark += m; count++; }
+                });
+                const avg = count > 0 ? (totalMark / count).toFixed(1) : '-';
+                return { avg, completed: keys.length };
+            };
+
+            const progA213 = viewMode === 'syllabus' ? calcSyllabusProgress(grindState.a213, { pricing: 60, single: 20, multiple: 20 }) : calcPapersProgress('a213');
+            const progA112 = viewMode === 'syllabus' ? calcSyllabusProgress(grindState.a112, { macro: 55, micro: 40, models: 5 }) : calcPapersProgress('a112');
+            
+            // Timer Stats
+            const totalSecondsThisWeek = (grindState.studyTime?.seconds || 0) + liveTimer;
+            const hoursThisWeek = (totalSecondsThisWeek / 3600).toFixed(2);
+            const weeklyProgress = Math.min(100, (totalSecondsThisWeek / (20 * 3600)) * 100);
+
+            const formatLiveTime = (totalSeconds) => {
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = totalSeconds % 60;
+                return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+            };
+            const activeTimerStr = formatLiveTime(liveTimer);
+
+
+            const CheckItem = ({ label, weight, isChecked, onClick }) => (
+                <div onClick={onClick} className="flex items-center justify-between p-3 sm:p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                            {isChecked && <Icons.Check size={14} className="text-white" />}
+                        </div>
+                        <span className={`text-sm font-medium ${isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>{label}</span>
+                    </div>
+                    {weight && <span className="text-xs font-bold text-slate-400">{weight}%</span>}
+                </div>
+            );
+
+            const PaperGrid = ({ subjectKey }) => {
+                const list = grindState[subjectKey] || {};
+                const { avg, completed } = getPaperStats(subjectKey);
+                
+                return (
+                    <div>
+                        <div className="flex justify-between mb-3 bg-slate-200/50 dark:bg-slate-700/30 p-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300">
+                            <span>AVG MARK: <span className="text-indigo-600 dark:text-indigo-400">{avg}{avg !== '-' && '%'}</span></span>
+                            <span>{completed}/{PAST_PAPERS.length} DONE</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {PAST_PAPERS.map(paper => {
+                                const data = list[paper];
+                                let bgClass = "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400";
+                                if (data?.status === 'red') bgClass = "bg-red-500 text-white border-transparent shadow-md";
+                                if (data?.status === 'yellow') bgClass = "bg-amber-500 text-white border-transparent shadow-md";
+                                if (data?.status === 'green') bgClass = "bg-emerald-500 text-white border-transparent shadow-md";
+                                
+                                return (
+                                    <div key={paper} className="flex flex-col gap-1">
+                                        <button
+                                            onClick={() => togglePaperStatus(subjectKey === 'papersA213' ? 'a213' : 'a112', paper)}
+                                            className={`py-2 px-1 rounded-lg border text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 ${bgClass}`}
+                                        >
+                                            {data?.status === 'green' && <Icons.Check size={12} />}
+                                            {data?.status === 'yellow' && <Icons.TrendingUp size={12} />}
+                                            {data?.status === 'red' && <span className="w-2 h-2 block rounded-full bg-red-800/50"></span>}
+                                            {paper}
+                                        </button>
+                                        {data && (
+                                            <input 
+                                                type="number" 
+                                                placeholder="Mark %" 
+                                                value={data.mark || ''}
+                                                onChange={(e) => setPaperMark(subjectKey === 'papersA213' ? 'a213' : 'a112', paper, e.target.value)}
+                                                className="w-full text-center text-[10px] p-1.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                                                min="0" max="100"
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="pb-24 lg:pb-8 h-full min-h-screen bg-slate-50 dark:bg-slate-900 animate-fade-in">
+                    <header className="bg-indigo-900 text-white pt-8 pb-20 px-6 relative overflow-hidden">
+                        <div className="max-w-5xl mx-auto relative z-10 flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold mb-1">The Grind</h1>
+                                <p className="text-indigo-200 text-sm">Semester 2 Target: 20 hrs/week • Mar to Sep</p>
+                            </div>
+                            <div className="flex gap-3 mt-2 md:mt-0">
+                                <CountdownTimer targetDate={new Date('2026-09-24T14:00:00').getTime()} label="A112 (Sep 24)" colorBorder="border-indigo-400" colorBg="bg-indigo-800/60 text-indigo-100" />
+                                <CountdownTimer targetDate={new Date('2026-10-07T09:00:00').getTime()} label="A213 (Oct 07)" colorBorder="border-teal-400" colorBg="bg-teal-800/60 text-teal-100" />
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2"></div>
+                    </header>
+
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 space-y-6">
+                        {/* Weekly Timeline */}
+                        <div className="bg-white dark:bg-slate-800 p-5 sm:p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                        <Icons.Clock size={20} className="text-indigo-500" /> 20-Hour Weekly Goal
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Resets every Monday. Logged: {hoursThisWeek} / 20 hrs</p>
+                                </div>
+                                <div className="flex items-center gap-4 w-full sm:w-auto">
+                                    <button 
+                                        onClick={toggleTimer}
+                                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all flex-grow justify-center sm:flex-grow-0
+                                        ${grindState.studyTime?.sessionStart ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400 animate-pulse' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/80'}`}
+                                    >
+                                        {grindState.studyTime?.sessionStart ? <Icons.Square size={16} /> : <Icons.Play size={16} />}
+                                        {grindState.studyTime?.sessionStart ? activeTimerStr : 'Start Session'}
+                                    </button>
+                                    {/* Manual Tracker for total weeks (Desktop) */}
+                                    <div className="hidden sm:flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <button onClick={() => adjustWeeks(-1)} className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">-</button>
+                                        <span className="text-xs font-bold w-12 text-center dark:text-slate-200">Wk {grindState.weeksCompleted}</span>
+                                        <button onClick={() => adjustWeeks(1)} className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:text-indigo-500">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <ProgressBar percentage={weeklyProgress} color="bg-indigo-500" height="h-3" />
+                            
+                            {/* Manual Tracker for total weeks (Mobile) */}
+                            <div className="mt-4 sm:hidden flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-3">
+                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Macro Weeks Completed</span>
+                                 <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <button onClick={() => adjustWeeks(-1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">-</button>
+                                    <span className="text-sm font-bold w-8 text-center dark:text-slate-200">{grindState.weeksCompleted}</span>
+                                    <button onClick={() => adjustWeeks(1)} className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* View Mode Toggle */}
+                        <div className="flex justify-center mb-2">
+                            <div className="bg-slate-200 dark:bg-slate-800 p-1 rounded-lg inline-flex shadow-inner">
+                                <button 
+                                    onClick={() => setViewMode('syllabus')}
+                                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'syllabus' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    Syllabus Topics
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('papers')}
+                                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'papers' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    Past Papers
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Side by side Syllabus Tracker */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* A213 */}
+                            <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="text-xs font-bold bg-teal-600 text-white px-2 py-0.5 rounded">A213</span>
+                                            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">Contingencies</h2>
+                                        </div>
+                                        <span className="text-lg font-bold text-teal-600 dark:text-teal-400">{Math.round(progA213)}%</span>
+                                    </div>
+                                    <ProgressBar percentage={progA213} color="bg-teal-500" />
+                                </div>
+                                
+                                {viewMode === 'syllabus' ? (
+                                    <div className="space-y-3 flex-grow">
+                                        <CheckItem label="Pricing & Reserving" weight={60} isChecked={grindState.a213.pricing} onClick={() => toggleSyllabus('a213', 'pricing')} />
+                                        <CheckItem label="Single Decrement Models" weight={20} isChecked={grindState.a213.single} onClick={() => toggleSyllabus('a213', 'single')} />
+                                        <CheckItem label="Multiple Decrement Models" weight={20} isChecked={grindState.a213.multiple} onClick={() => toggleSyllabus('a213', 'multiple')} />
+                                    </div>
+                                ) : (
+                                    <div className="flex-grow animate-fade-in">
+                                        <PaperGrid subjectKey="papersA213" />
+                                    </div>
+                                )}
+
+                                {/* Notes Section */}
+                                <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                    <button onClick={() => setExpandedNotes(p => ({...p, a213: !p.a213}))} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors w-full">
+                                        <Icons.Edit size={14} /> Subject Notes {grindState.notes?.a213 ? '(Saved)' : ''}
+                                    </button>
+                                    {expandedNotes.a213 && (
+                                        <textarea 
+                                            value={grindState.notes?.a213 || ''}
+                                            onChange={e => updateNotes('a213', e.target.value)}
+                                            className="mt-3 w-full h-28 p-3 text-xs rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-teal-500 outline-none resize-none transition-all"
+                                            placeholder="Write formulas, edge cases, or chapter summaries..."
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* A112 */}
+                            <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="text-xs font-bold bg-indigo-600 text-white px-2 py-0.5 rounded">A112</span>
+                                            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">Business Economics</h2>
+                                        </div>
+                                        <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{Math.round(progA112)}%</span>
+                                    </div>
+                                    <ProgressBar percentage={progA112} color="bg-indigo-500" />
+                                </div>
+                                
+                                {viewMode === 'syllabus' ? (
+                                    <div className="space-y-3 flex-grow">
+                                        <CheckItem label="Macroeconomics" weight={55} isChecked={grindState.a112.macro} onClick={() => toggleSyllabus('a112', 'macro')} />
+                                        <CheckItem label="Microeconomics" weight={40} isChecked={grindState.a112.micro} onClick={() => toggleSyllabus('a112', 'micro')} />
+                                        <CheckItem label="Models & History" weight={5} isChecked={grindState.a112.models} onClick={() => toggleSyllabus('a112', 'models')} />
+                                    </div>
+                                ) : (
+                                    <div className="flex-grow animate-fade-in">
+                                        <PaperGrid subjectKey="papersA112" />
+                                    </div>
+                                )}
+
+                                {/* Notes Section */}
+                                <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                    <button onClick={() => setExpandedNotes(p => ({...p, a112: !p.a112}))} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors w-full">
+                                        <Icons.Edit size={14} /> Subject Notes {grindState.notes?.a112 ? '(Saved)' : ''}
+                                    </button>
+                                    {expandedNotes.a112 && (
+                                        <textarea 
+                                            value={grindState.notes?.a112 || ''}
+                                            onChange={e => updateNotes('a112', e.target.value)}
+                                            className="mt-3 w-full h-28 p-3 text-xs rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-all"
+                                            placeholder="Write definitions, graphs to remember, formulas..."
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- Main App Shell ---
+        function App() {
+            const [activeTab, setActiveTab] = useState('grind'); // 'pipeline' or 'grind'
+            const [darkMode, setDarkMode] = useState(true); // Default to dark for PWA feel
+            const [showSettings, setShowSettings] = useState(false);
+            
+            // State: Pipeline Checkmarks
+            const [completedSubjects, setCompletedSubjects] = useState(() => {
+                const saved = localStorage.getItem('assa-pipeline-v2');
+                return saved ? JSON.parse(saved) : ['A211']; 
+            });
+
+            // State: The Grind Progress + Migration Logic
+            const [grindState, setGrindState] = useState(() => {
+                const saved = localStorage.getItem('assa-grind-v1');
+                let parsed = saved ? JSON.parse(saved) : { ...INITIAL_GRIND_STATE };
+
+                // MIGRATION: Array to Object Heatmap structure for Past Papers
+                if (Array.isArray(parsed.papersA213)) {
+                    let obj = {}; parsed.papersA213.forEach(p => obj[p] = { status: 'green', mark: '' }); parsed.papersA213 = obj;
+                }
+                if (Array.isArray(parsed.papersA112)) {
+                    let obj = {}; parsed.papersA112.forEach(p => obj[p] = { status: 'green', mark: '' }); parsed.papersA112 = obj;
+                }
+                
+                // Ensure Notes exist
+                if (!parsed.notes) parsed.notes = { a213: '', a112: '' };
+
+                // Ensure Study Timer structure exists and handles Monday reset
+                const currentWeek = getISOWeek();
+                if (!parsed.studyTime || parsed.studyTime.week !== currentWeek) {
+                    parsed.studyTime = { week: currentWeek, seconds: 0, sessionStart: null };
+                }
+
+                return parsed;
+            });
+
+            // Sync Local Storage
+            useEffect(() => localStorage.setItem('assa-pipeline-v2', JSON.stringify(completedSubjects)), [completedSubjects]);
+            useEffect(() => localStorage.setItem('assa-grind-v1', JSON.stringify(grindState)), [grindState]);
+
+            // Sync Dark Mode
+            useEffect(() => {
+                const root = document.documentElement;
+                if (darkMode) {
+                    root.classList.add('dark');
+                    document.body.classList.add('bg-slate-900', 'text-slate-100');
+                    document.body.classList.remove('bg-slate-50', 'text-slate-900');
+                    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
+                } else {
+                    root.classList.remove('dark');
+                    document.body.classList.remove('bg-slate-900', 'text-slate-100');
+                    document.body.classList.add('bg-slate-50', 'text-slate-900');
+                    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f8fafc');
+                }
+            }, [darkMode]);
+
+            const handleReset = () => {
+                if(window.confirm("Delete all data? This cannot be undone.")) {
+                    setCompletedSubjects(['A211']);
+                    setGrindState({ ...INITIAL_GRIND_STATE, studyTime: { week: getISOWeek(), seconds: 0, sessionStart: null } });
+                    setShowSettings(false);
+                }
+            };
+
+            // Global Stats Calculation
+            const stats = useMemo(() => {
+                const has = (code) => completedSubjects.includes(code);
+                const countCompleted = (list) => list.filter(s => has(s.code)).length;
+
+                const a1Total = SYLLABUS.foundation.subjects.length;
+                const a2Total = SYLLABUS.intermediate.subjects.length;
+                const a1Done = countCompleted(SYLLABUS.foundation.subjects);
+                const a2Done = countCompleted(SYLLABUS.intermediate.subjects);
+                const n111Done = has('N111') ? 1 : 0;
+                
+                const tassaTotalItems = a1Total + a2Total + 1; 
+                const tassaDoneItems = a1Done + a2Done + n111Done;
+
+                const a3Done = countCompleted(SYLLABUS.risk.subjects);
+                const n2n3Done = (has('N211') ? 1 : 0) + (has('N311') ? 1 : 0);
+                const amassaTotalItems = tassaTotalItems + 1 + 2; 
+                const amassaDoneItems = tassaDoneItems + a3Done + n2n3Done;
+
+                const f1Count = countCompleted(SYLLABUS.fellowship_principles.subjects);
+                const f2Count = countCompleted(SYLLABUS.fellowship_applications.subjects);
+                const n4Done = has('N411') ? 1 : 0;
+
+                const fassaTotalItems = amassaTotalItems + 2 + 1 + 1; 
+                const fassaDoneItems = amassaDoneItems + Math.min(f1Count, 2) + Math.min(f2Count, 1) + n4Done;
+
+                let remainingCost = 0;
+                [SYLLABUS.foundation, SYLLABUS.intermediate, SYLLABUS.risk, SYLLABUS.normative, SYLLABUS.fellowship_principles, SYLLABUS.fellowship_applications, SYLLABUS.normative_fellow].forEach(section => {
+                    section.subjects.forEach(subject => {
+                        if (!has(subject.code)) {
+                            if (section.id === 'F1' && f1Count >= 2) return; 
+                            if (section.id === 'F2' && f2Count >= 1) return;
+                            remainingCost += subject.price;
+                        }
+                    });
+                });
+
+                return {
+                    tassa: (tassaDoneItems / tassaTotalItems) * 100,
+                    amassa: (amassaDoneItems / amassaTotalItems) * 100,
+                    fassa: (fassaDoneItems / fassaTotalItems) * 100,
+                    remainingCost
+                };
+            }, [completedSubjects]);
+
+            return (
+                <div className="flex flex-col md:flex-row min-h-screen">
+                    
+                    <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} onReset={handleReset} darkMode={darkMode} setDarkMode={setDarkMode} />
+
+                    {/* Navigation: Bottom on Mobile, Left Sidebar on Desktop */}
+                    <nav className="fixed z-50 bottom-0 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 md:w-20 lg:w-64 md:h-screen md:border-t-0 md:border-r md:flex-col justify-between flex pb-safe">
+                        <div className="flex md:flex-col w-full h-16 md:h-auto md:pt-8 md:gap-4 px-2 md:px-4 items-center md:items-start justify-around">
+                            
+                            <div className="hidden lg:block w-full px-2 mb-8">
+                                <div className="font-bold text-xl dark:text-white flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded bg-gradient-to-br from-teal-400 to-indigo-600 flex items-center justify-center text-white text-xs">A</div>
+                                    ASSA Tracker
+                                </div>
+                            </div>
+
+                            <button onClick={() => setActiveTab('grind')} className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full transition-colors ${activeTab === 'grind' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                <Icons.Swords size={22} className={activeTab === 'grind' ? 'fill-indigo-100 dark:fill-indigo-900/50' : ''} />
+                                <span className="text-[10px] lg:text-sm font-bold">The Grind</span>
+                            </button>
+                            
+                            <button onClick={() => setActiveTab('pipeline')} className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full transition-colors ${activeTab === 'pipeline' ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                <Icons.LayoutDashboard size={22} className={activeTab === 'pipeline' ? 'fill-teal-100 dark:fill-teal-900/50' : ''} />
+                                <span className="text-[10px] lg:text-sm font-bold">Pipeline</span>
+                            </button>
+
+                            <div className="md:mt-auto md:mb-8 md:w-full">
+                                <button onClick={() => setShowSettings(true)} className="flex flex-col lg:flex-row items-center gap-1 lg:gap-3 p-2 lg:px-4 lg:py-3 rounded-lg lg:w-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                    <Icons.Settings size={22} />
+                                    <span className="text-[10px] lg:text-sm font-bold">Settings</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Main Content Area */}
+                    <main className="flex-grow md:ml-20 lg:ml-64 w-full">
+                        {activeTab === 'pipeline' ? (
+                            <PipelineView completedSubjects={completedSubjects} toggleSubject={(c) => setCompletedSubjects(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])} stats={stats} />
+                        ) : (
+                            <GrindView grindState={grindState} setGrindState={setGrindState} />
+                        )}
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

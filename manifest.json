@@ -1,10 +1,10 @@
 {
-  "name": "ASSA Qualification Tracker 2026",
-  "short_name": "ASSA Tracker",
-  "description": "Your 4,000-hour journey to Actuarial Fellowship. Track syllabus progress, fees, and study hours.",
+  "name": "Enock",
+  "short_name": "Enock",
+  "description": "Home for studies, rentals, tasks, and goals.",
   "start_url": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
   "icons": [
@@ -12,14 +12,14 @@
       "src": "icons/assa-tracker-icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icons/assa-tracker-icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
-  "categories": ["education", "productivity", "finance"]
+  "categories": ["productivity", "lifestyle"]
 }
